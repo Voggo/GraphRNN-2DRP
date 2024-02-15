@@ -1,0 +1,6 @@
+/.pytest_cache
+/.vscode
+/plots_img
+/__pycache__
+/tests/__pycache__
+/tests/.pytest_cache
