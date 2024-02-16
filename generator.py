@@ -1,6 +1,6 @@
-from random import randint
-from typing import List
+import random
 import numpy as np
+from typing import List
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
@@ -31,71 +31,54 @@ def reduce_rects(rects: np.ndarray, n_rects: int) -> List[Rectangle]:
     if n_rects >= rects.size:
         return rects.flatten().tolist()
 
-    cap = 0
+    cap = 0 # temporary cap to prevent infinite loop
     while np.count_nonzero(rects != None) > n_rects:
-        x = randint(0, rects.shape[0] - 1)
-        y = randint(0, rects.shape[1] - 1)
-        i = 0
-        is_none = {"x_plus": False, "y_plus": False, "x_minus": False, "y_minus": False}
-        while True:
-            i += 1
-            if rects[x, y] is None:
+        x = random.randint(0, rects.shape[0] - 1)
+        y = random.randint(0, rects.shape[1] - 1)
+        direction = random.choice(([1, 0], [0, 1], [-1, 0], [0, -1]))
+        x_compare = x + direction[0]
+        y_compare = y + direction[1]
+        if (
+            rects[x, y] is None
+            or x_compare >= rects.shape[0]
+            or y_compare >= rects.shape[1]
+            or x_compare < 0
+            or y_compare < 0
+        ):
+            continue
+        while rects[x_compare, y_compare] is None: # Problem here can jump over another rectangle
+            if (
+                x_compare + direction[0] < rects.shape[0]
+                and x_compare + direction[0] >= 0
+                and y_compare + direction[1] < rects.shape[1]
+                and y_compare + direction[1] >= 0
+            ):
+                x_compare += direction[0]
+                y_compare += direction[1]
+            else:
                 break
 
-            if (
-                is_none["x_plus"] is False
-                and x + i < rects.shape[0]
-                and rects[x + 1, y] is not None
-                and rects[x, y].height == rects[x + 1, y].height
-            ):
-                rects[x, y].width = rects[x, y].width + rects[x + 1, y].width
-                rects[x + 1, y] = None
-                break
-            else:
-                is_none["x_plus"] = True
-            if (
-                is_none["y_plus"] is False
-                and y + i < rects.shape[1]
-                and rects[x, y + 1] is not None
-                and rects[x, y].width == rects[x, y + 1].width
-            ):
-                rects[x, y].height = rects[x, y].height + rects[x, y + 1].height
-                rects[x, y + 1] = None
-                break
-            else:
-                is_none["y_plus"] = True
-            if (
-                is_none["x_minus"] is False
-                and x - i >= 0
-                and rects[x - i, y] is not None
-                and rects[x, y].height == rects[x - i, y].height
-            ):
-                rects[x - i, y].width = rects[x - i, y].width + rects[x, y].width
-                rects[x, y] = None
-                break
-            else:
-                is_none["x_minus"] = True
-            if (
-                is_none["y_minus"] is False
-                and y - i >= 0
-                and rects[x, y - i] is not None
-                and rects[x, y].width == rects[x, y - i].width
-            ):
-                rects[x, y - i].height = rects[x, y - i].height + rects[x, y].height
-                rects[x, y] = None
-                break
-            else:
-                is_none["y_minus"] = True
+        if rects[x_compare, y_compare] is None:
+            continue
 
-            if (
-                is_none["x_plus"]
-                and is_none["y_plus"]
-                and is_none["x_minus"]
-                and is_none["y_minus"]
-            ):
-                break
+        if direction[0] > 0:
+            if rects[x, y].height == rects[x_compare, y_compare].height:
+                rects[x, y].width += rects[x_compare, y_compare].width
+                rects[x_compare, y_compare] = None
+        if direction[1] > 0:
+            if rects[x, y].width == rects[x_compare, y_compare].width:
+                rects[x, y].height += rects[x_compare, y_compare].height
+                rects[x_compare, y_compare] = None
+        if direction[0] < 0:
+            if rects[x, y].height == rects[x_compare, y_compare].height:
+                rects[x_compare, y_compare].width += rects[x, y].width
+                rects[x, y] = None
+        if direction[1] < 0:
+            if rects[x, y].width == rects[x_compare, y_compare].width:
+                rects[x_compare, y_compare].height += rects[x, y].height
+                rects[x, y] = None
         cap += 1
-        if cap > 1000000:
+        if cap > 1000:
             break
 
     rects = rects.flatten().tolist()
@@ -109,7 +92,7 @@ def get_line_breaks(line: int, n_breaks: int) -> List[int]:
     result = []
     for _ in range(n_breaks):
         while True:
-            randnum = randint(1, line)
+            randnum = random.randint(1, line)
             if randnum not in result:
                 result.append(randnum)
                 break
@@ -122,6 +105,7 @@ if __name__ == "__main__":
     # reduced_rects = reduce_rects(test_rects, 10)
     # print(reduced_rects)
     # plot_rects(reduced_rects, ax_lim=5, ay_lim=5)
-    test_rects = generate_rects(50, 50, 5)
-    reduced_rects = reduce_rects(test_rects, 5)
+    test_rects = generate_rects(50, 50, 4)
+    # plot_rects(test_rects.flatten().tolist(), ax_lim=50, ay_lim=50)
+    reduced_rects = reduce_rects(test_rects, 11)
     plot_rects(reduced_rects, ax_lim=50, ay_lim=50)
