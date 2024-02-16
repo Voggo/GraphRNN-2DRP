@@ -6,7 +6,7 @@ from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 
 
-def generate_rects(width: int, height: int, n_breaks=10) -> np.ndarray:
+def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
     if width <= 0 or height <= 0 or n_breaks <= 0:
         raise ValueError("All parameters must be positive")
@@ -25,58 +25,62 @@ def generate_rects(width: int, height: int, n_breaks=10) -> np.ndarray:
         x_axis = 0
     return rectangles
 
+def rectangles_overlap(rect1: Rectangle, rect2: Rectangle) -> bool:
+    """Check if two rectangles overlap."""
+    return (
+        rect1.lower_left.x < rect2.lower_left.x + rect2.width
+        and rect1.lower_left.x + rect1.width > rect2.lower_left.x
+        and rect1.lower_left.y < rect2.lower_left.y + rect2.height
+        and rect1.lower_left.y + rect1.height > rect2.lower_left.y
+    )
 
 def reduce_rects(rects: np.ndarray, n_rects: int) -> List[Rectangle]:
     """Return a list of n_rects random Rectangles from a list of Rectangles."""
     if n_rects >= rects.size:
         return rects.flatten().tolist()
 
-    cap = 0 # temporary cap to prevent infinite loop
+    cap = 0  # Temporary cap to prevent infinite loop
     while np.count_nonzero(rects != None) > n_rects:
         x = random.randint(0, rects.shape[0] - 1)
         y = random.randint(0, rects.shape[1] - 1)
         direction = random.choice(([1, 0], [0, 1], [-1, 0], [0, -1]))
         x_compare = x + direction[0]
         y_compare = y + direction[1]
+
+        # Check if the comparison indices are within bounds
         if (
-            rects[x, y] is None
-            or x_compare >= rects.shape[0]
+            x_compare >= rects.shape[0]
             or y_compare >= rects.shape[1]
             or x_compare < 0
             or y_compare < 0
         ):
             continue
-        while rects[x_compare, y_compare] is None: # Problem here can jump over another rectangle
-            if (
-                x_compare + direction[0] < rects.shape[0]
-                and x_compare + direction[0] >= 0
-                and y_compare + direction[1] < rects.shape[1]
-                and y_compare + direction[1] >= 0
-            ):
-                x_compare += direction[0]
-                y_compare += direction[1]
-            else:
-                break
 
-        if rects[x_compare, y_compare] is None:
-            continue
+        # Check if both rectangles are not None and there is no overlap
+        if (
+            rects[x, y] is not None
+            and rects[x_compare, y_compare] is not None
+            and not rectangles_overlap(rects[x, y], rects[x_compare, y_compare])
+        ):
+            # Merge the rectangles
+            direction = [x_compare - x, y_compare - y]
+            if direction[0] > 0:
+                if rects[x, y].height == rects[x_compare, y_compare].height:
+                    rects[x, y].width += rects[x_compare, y_compare].width
+                    rects[x_compare, y_compare] = None
+            if direction[1] > 0:
+                if rects[x, y].width == rects[x_compare, y_compare].width:
+                    rects[x, y].height += rects[x_compare, y_compare].height
+                    rects[x_compare, y_compare] = None
+            if direction[0] < 0:
+                if rects[x, y].height == rects[x_compare, y_compare].height:
+                    rects[x_compare, y_compare].width += rects[x, y].width
+                    rects[x, y] = None
+            if direction[1] < 0:
+                if rects[x, y].width == rects[x_compare, y_compare].width:
+                    rects[x_compare, y_compare].height += rects[x, y].height
+                    rects[x, y] = None
 
-        if direction[0] > 0:
-            if rects[x, y].height == rects[x_compare, y_compare].height:
-                rects[x, y].width += rects[x_compare, y_compare].width
-                rects[x_compare, y_compare] = None
-        if direction[1] > 0:
-            if rects[x, y].width == rects[x_compare, y_compare].width:
-                rects[x, y].height += rects[x_compare, y_compare].height
-                rects[x_compare, y_compare] = None
-        if direction[0] < 0:
-            if rects[x, y].height == rects[x_compare, y_compare].height:
-                rects[x_compare, y_compare].width += rects[x, y].width
-                rects[x, y] = None
-        if direction[1] < 0:
-            if rects[x, y].width == rects[x_compare, y_compare].width:
-                rects[x_compare, y_compare].height += rects[x, y].height
-                rects[x, y] = None
         cap += 1
         if cap > 1000:
             break
@@ -105,7 +109,7 @@ if __name__ == "__main__":
     # reduced_rects = reduce_rects(test_rects, 10)
     # print(reduced_rects)
     # plot_rects(reduced_rects, ax_lim=5, ay_lim=5)
-    test_rects = generate_rects(50, 50, 4)
-    # plot_rects(test_rects.flatten().tolist(), ax_lim=50, ay_lim=50)
-    reduced_rects = reduce_rects(test_rects, 11)
+    test_rects = generate_rects(50, 50, 5)
+    # plot_rects(test_rects.flatten().tolist(), ax_lim=100, ay_lim=100)
+    reduced_rects = reduce_rects(test_rects, 25)
     plot_rects(reduced_rects, ax_lim=50, ay_lim=50)
