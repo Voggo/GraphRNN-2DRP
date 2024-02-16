@@ -1,7 +1,6 @@
-from random import randint, shuffle
+from random import randint
 from typing import List
 import numpy as np
-import time
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
@@ -9,6 +8,8 @@ from dataclasses_rect_point import Rectangle, Point
 
 def generate_rects(width: int, height: int, n_breaks=10) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
+    if width <= 0 or height <= 0 or n_breaks <= 0:
+        raise ValueError("All parameters must be positive")
     x_segments = get_line_breaks(width, n_breaks)  # Add 0 to the beginning of the list
     y_segments = get_line_breaks(height, n_breaks)
     rectangles = np.empty((len(y_segments) + 1, len(x_segments) + 1), dtype=Rectangle)
@@ -121,6 +122,6 @@ if __name__ == "__main__":
     # reduced_rects = reduce_rects(test_rects, 10)
     # print(reduced_rects)
     # plot_rects(reduced_rects, ax_lim=5, ay_lim=5)
-    test_rects = generate_rects(50, 50, 20)
-    reduced_rects = reduce_rects(test_rects, 100)
+    test_rects = generate_rects(50, 50, 5)
+    reduced_rects = reduce_rects(test_rects, 5)
     plot_rects(reduced_rects, ax_lim=50, ay_lim=50)

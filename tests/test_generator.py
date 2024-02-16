@@ -4,6 +4,7 @@ from dataclasses_rect_point import Rectangle, Point
 from plot_rects import plot_rects
 from generator import get_line_breaks, generate_rects
 
+
 class TestGetLineBreaks:
 
     # Returns a list of n_breaks random line breaks within the given line range.
@@ -55,25 +56,50 @@ class TestGetLineBreaks:
         assert all(0 <= break_point <= line for break_point in result)
 
 
-# class TestGenerateRects:
+class TestGenerateRects:
 
-#     def test_generate_rects_expected_number_of_rectangles(self):
-#         # Arrange
-#         width = 10
-#         height = 10
-#         n_breaks = 2
+    def test_generate_rects_expected_number_of_rectangles(self):
+        # Arrange
+        width = 10
+        height = 10
+        n_breaks = 2
 
-#         # Act
-#         result = generate_rects(width, height, n_breaks)
-        
-#         # Plot the rectangles
-#         plot_rects(
-#             result,
-#             ax_lim=width,
-#             ay_lim=height,
-#             filename="test_generate_rects_expected_number_of_rectangles.png",
-#             show=False,
-#         )
+        # Act
+        result = generate_rects(width, height, n_breaks).flatten().tolist()
 
-#         # Assert
-#         assert len(result) == (n_breaks + 1) ** 2
+        # Plot the rectangles
+        plot_rects(
+            result,
+            ax_lim=width,
+            ay_lim=height,
+            filename="test_generate_rects_expected_number_of_rectangles.png",
+            show=False,
+        )
+
+        # Assert
+        assert len(result) == (n_breaks + 1) ** 2
+
+        # Should generate a numpy ndarray of rectangles with dimensions (n_breaks+1, n_breaks+1)
+
+    def test_generate_rects_dimensions(self):
+        width = 10
+        height = 10
+        n_breaks = 5
+        rectangles = generate_rects(width, height, n_breaks)
+        assert rectangles.shape == (n_breaks + 1, n_breaks + 1)
+
+    # Should raise a TypeError when width or height is not an integer
+    def test_generate_rects_type_error_width_height(self):
+        width = 10.5
+        height = "10"
+        n_breaks = 5
+        with pytest.raises(TypeError):
+            generate_rects(width, height, n_breaks)
+
+    # Should raise a ValueError when width or height is negative
+    def test_generate_rects_value_error_width_height(self):
+        width = -10
+        height = 10
+        n_breaks = 5
+        with pytest.raises(ValueError):
+            generate_rects(width, height, n_breaks)
