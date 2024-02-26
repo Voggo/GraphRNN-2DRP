@@ -25,14 +25,18 @@ def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
         x_axis = 0
     return rectangles
 
+
 def rectangles_overlap(rect1: Rectangle, rect2: Rectangle) -> bool:
     """Check if two rectangles overlap."""
+    if rect1 is None or rect2 is None:
+        return True
     return (
         rect1.lower_left.x < rect2.lower_left.x + rect2.width
         and rect1.lower_left.x + rect1.width > rect2.lower_left.x
         and rect1.lower_left.y < rect2.lower_left.y + rect2.height
         and rect1.lower_left.y + rect1.height > rect2.lower_left.y
     )
+
 
 def reduce_rects(rects: np.ndarray, n_rects: int) -> List[Rectangle]:
     """Return a list of n_rects random Rectangles from a list of Rectangles."""
@@ -68,21 +72,26 @@ def reduce_rects(rects: np.ndarray, n_rects: int) -> List[Rectangle]:
                 if rects[x, y].height == rects[x_compare, y_compare].height:
                     rects[x, y].width += rects[x_compare, y_compare].width
                     rects[x_compare, y_compare] = None
+                    print("Rectangle removed")
             if direction[1] > 0:
                 if rects[x, y].width == rects[x_compare, y_compare].width:
                     rects[x, y].height += rects[x_compare, y_compare].height
                     rects[x_compare, y_compare] = None
+                    print("Rectangle removed")
             if direction[0] < 0:
                 if rects[x, y].height == rects[x_compare, y_compare].height:
                     rects[x_compare, y_compare].width += rects[x, y].width
                     rects[x, y] = None
+                    print("Rectangle removed")
             if direction[1] < 0:
                 if rects[x, y].width == rects[x_compare, y_compare].width:
                     rects[x_compare, y_compare].height += rects[x, y].height
                     rects[x, y] = None
+                    print("Rectangle removed")
 
         cap += 1
-        if cap > 1000:
+        if cap > 1000000:
+            print("Infinite loop detected")
             break
 
     rects = rects.flatten().tolist()
@@ -109,7 +118,7 @@ if __name__ == "__main__":
     # reduced_rects = reduce_rects(test_rects, 10)
     # print(reduced_rects)
     # plot_rects(reduced_rects, ax_lim=5, ay_lim=5)
-    test_rects = generate_rects(50, 50, 5)
+    test_rects = generate_rects(500, 500, 10)
     # plot_rects(test_rects.flatten().tolist(), ax_lim=100, ay_lim=100)
-    reduced_rects = reduce_rects(test_rects, 25)
-    plot_rects(reduced_rects, ax_lim=50, ay_lim=50)
+    reduced_rects = reduce_rects(test_rects, 6)
+    plot_rects(reduced_rects, ax_lim=500, ay_lim=500)
