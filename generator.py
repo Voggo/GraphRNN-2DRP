@@ -1,12 +1,12 @@
-from random import randint
-from typing import List
+import random
 import numpy as np
+from typing import List
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 
 
-def generate_rects(width: int, height: int, n_breaks=10) -> np.ndarray:
+def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
     if width <= 0 or height <= 0 or n_breaks <= 0:
         raise ValueError("All parameters must be positive")
@@ -26,76 +26,72 @@ def generate_rects(width: int, height: int, n_breaks=10) -> np.ndarray:
     return rectangles
 
 
+def rectangles_overlap(rect1: Rectangle, rect2: Rectangle) -> bool:
+    """Check if two rectangles overlap."""
+    if rect1 is None or rect2 is None:
+        return True
+    return (
+        rect1.lower_left.x < rect2.lower_left.x + rect2.width
+        and rect1.lower_left.x + rect1.width > rect2.lower_left.x
+        and rect1.lower_left.y < rect2.lower_left.y + rect2.height
+        and rect1.lower_left.y + rect1.height > rect2.lower_left.y
+    )
+
+
 def reduce_rects(rects: np.ndarray, n_rects: int) -> List[Rectangle]:
     """Return a list of n_rects random Rectangles from a list of Rectangles."""
     if n_rects >= rects.size:
         return rects.flatten().tolist()
 
-    cap = 0
+    cap = 0  # Temporary cap to prevent infinite loop
     while np.count_nonzero(rects != None) > n_rects:
-        x = randint(0, rects.shape[0] - 1)
-        y = randint(0, rects.shape[1] - 1)
-        i = 0
-        is_none = {"x_plus": False, "y_plus": False, "x_minus": False, "y_minus": False}
-        while True:
-            i += 1
-            if rects[x, y] is None:
-                break
+        x = random.randint(0, rects.shape[0] - 1)
+        y = random.randint(0, rects.shape[1] - 1)
+        direction = random.choice(([1, 0], [0, 1], [-1, 0], [0, -1]))
+        x_compare = x + direction[0]
+        y_compare = y + direction[1]
 
-            if (
-                is_none["x_plus"] is False
-                and x + i < rects.shape[0]
-                and rects[x + 1, y] is not None
-                and rects[x, y].height == rects[x + 1, y].height
-            ):
-                rects[x, y].width = rects[x, y].width + rects[x + 1, y].width
-                rects[x + 1, y] = None
-                break
-            else:
-                is_none["x_plus"] = True
-            if (
-                is_none["y_plus"] is False
-                and y + i < rects.shape[1]
-                and rects[x, y + 1] is not None
-                and rects[x, y].width == rects[x, y + 1].width
-            ):
-                rects[x, y].height = rects[x, y].height + rects[x, y + 1].height
-                rects[x, y + 1] = None
-                break
-            else:
-                is_none["y_plus"] = True
-            if (
-                is_none["x_minus"] is False
-                and x - i >= 0
-                and rects[x - i, y] is not None
-                and rects[x, y].height == rects[x - i, y].height
-            ):
-                rects[x - i, y].width = rects[x - i, y].width + rects[x, y].width
-                rects[x, y] = None
-                break
-            else:
-                is_none["x_minus"] = True
-            if (
-                is_none["y_minus"] is False
-                and y - i >= 0
-                and rects[x, y - i] is not None
-                and rects[x, y].width == rects[x, y - i].width
-            ):
-                rects[x, y - i].height = rects[x, y - i].height + rects[x, y].height
-                rects[x, y] = None
-                break
-            else:
-                is_none["y_minus"] = True
+        # Check if the comparison indices are within bounds
+        if (
+            x_compare >= rects.shape[0]
+            or y_compare >= rects.shape[1]
+            or x_compare < 0
+            or y_compare < 0
+        ):
+            continue
 
-            if (
-                is_none["x_plus"]
-                and is_none["y_plus"]
-                and is_none["x_minus"]
-                and is_none["y_minus"]
-            ):
-                break
+        # Check if both rectangles are not None and there is no overlap
+        if (
+            rects[x, y] is not None
+            and rects[x_compare, y_compare] is not None
+            and not rectangles_overlap(rects[x, y], rects[x_compare, y_compare])
+        ):
+            # Merge the rectangles
+            direction = [x_compare - x, y_compare - y]
+            if direction[0] > 0:
+                if rects[x, y].height == rects[x_compare, y_compare].height:
+                    rects[x, y].width += rects[x_compare, y_compare].width
+                    rects[x_compare, y_compare] = None
+                    print("Rectangle removed")
+            if direction[1] > 0:
+                if rects[x, y].width == rects[x_compare, y_compare].width:
+                    rects[x, y].height += rects[x_compare, y_compare].height
+                    rects[x_compare, y_compare] = None
+                    print("Rectangle removed")
+            if direction[0] < 0:
+                if rects[x, y].height == rects[x_compare, y_compare].height:
+                    rects[x_compare, y_compare].width += rects[x, y].width
+                    rects[x, y] = None
+                    print("Rectangle removed")
+            if direction[1] < 0:
+                if rects[x, y].width == rects[x_compare, y_compare].width:
+                    rects[x_compare, y_compare].height += rects[x, y].height
+                    rects[x, y] = None
+                    print("Rectangle removed")
+
         cap += 1
         if cap > 1000000:
+            print("Infinite loop detected")
             break
 
     rects = rects.flatten().tolist()
@@ -109,7 +105,7 @@ def get_line_breaks(line: int, n_breaks: int) -> List[int]:
     result = []
     for _ in range(n_breaks):
         while True:
-            randnum = randint(1, line)
+            randnum = random.randint(1, line)
             if randnum not in result:
                 result.append(randnum)
                 break
@@ -122,6 +118,7 @@ if __name__ == "__main__":
     # reduced_rects = reduce_rects(test_rects, 10)
     # print(reduced_rects)
     # plot_rects(reduced_rects, ax_lim=5, ay_lim=5)
-    test_rects = generate_rects(50, 50, 5)
-    reduced_rects = reduce_rects(test_rects, 5)
-    plot_rects(reduced_rects, ax_lim=50, ay_lim=50)
+    test_rects = generate_rects(500, 500, 10)
+    # plot_rects(test_rects.flatten().tolist(), ax_lim=100, ay_lim=100)
+    reduced_rects = reduce_rects(test_rects, 6)
+    plot_rects(reduced_rects, ax_lim=500, ay_lim=500)
