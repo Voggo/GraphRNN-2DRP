@@ -128,11 +128,7 @@ def get_line_breaks(line: int, n_breaks: int) -> List[int]:
 
 
 if __name__ == "__main__":
-    # test_rects = generate_rects(5, 5, 3)
-    # reduced_rects = reduce_rects(test_rects, 10)
-    # print(reduced_rects)
-    # plot_rects(reduced_rects, ax_lim=5, ay_lim=5)
-    test_rects = generate_rects(50, 50, 10)
-    # plot_rects(test_rects.flatten().tolist(), ax_lim=100, ay_lim=100)
-    reduced_rects = reduce_rects(test_rects, convergence_limit=100)
-    plot_rects(reduced_rects, ax_lim=50, ay_lim=50)
+    for i in range(20):
+        test_rects = generate_rects(50, 50, 10)
+        reduced_rects = reduce_rects(test_rects, convergence_limit=100)
+        plot_rects(reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_{i}.png", show=False)
