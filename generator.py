@@ -77,7 +77,7 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
             # Merge the rectangles
             if direction[0] > 0:
                 if rects[x, y].height == rects[x_compare, y_compare].height:
-                    index = np.where(rects == rects[x_compare, y_compare])
+                    index = np.where(rects['lower_left'] == rects[x_compare, y_compare].lower_left)
                     rects[x, y].width += rects[x_compare, y_compare].width
                     rects[index] = rects[x, y]
                     convergence = 0
@@ -110,8 +110,8 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
             break
 
     rects_list: list[Rectangle] = rects.flatten().tolist()
-    rects = list(set(rects_list))
-    return [rect for rect in rects if rect is not None]
+    rects_list = list(set(rects_list))
+    return [rect for rect in rects_list if rect is not None]
 
 
 def print_rects(rects: np.ndarray) -> None:
