@@ -76,32 +76,52 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
         ):
             # Merge the rectangles
             if direction[0] > 0:
-                if rects[x, y].height == rects[x_compare, y_compare].height:
-                    index = np.where(rects['lower_left'] == rects[x_compare, y_compare].lower_left)
+                if (
+                    rects[x, y].height == rects[x_compare, y_compare].height
+                    and (rects[x, y].lower_left.x + rects[x, y].width)
+                    == rects[x_compare, y_compare].lower_left.x
+                    and rects[x, y].lower_left.y
+                    == rects[x_compare, y_compare].lower_left.y
+                ):
+                    index = np.where(rects == rects[x_compare, y_compare])
                     rects[x, y].width += rects[x_compare, y_compare].width
                     rects[index] = rects[x, y]
                     convergence = 0
-                    print("Rectangle removed")
             if direction[1] > 0:
-                if rects[x, y].width == rects[x_compare, y_compare].width:
+                if (
+                    rects[x, y].width == rects[x_compare, y_compare].width
+                    and (rects[x, y].lower_left.y + rects[x, y].height)
+                    == rects[x_compare, y_compare].lower_left.y
+                    and rects[x, y].lower_left.x
+                    == rects[x_compare, y_compare].lower_left.x
+                ):
                     index = np.where(rects == rects[x_compare, y_compare])
                     rects[x, y].height += rects[x_compare, y_compare].height
                     rects[index] = rects[x, y]
-                    print("Rectangle removed")
                     convergence = 0
             if direction[0] < 0:
-                if rects[x, y].height == rects[x_compare, y_compare].height:
+                if (
+                    rects[x, y].height == rects[x_compare, y_compare].height
+                    and (rects[x_compare, y_compare].lower_left.x - rects[x, y].width)
+                    == rects[x, y].lower_left.x
+                    and rects[x, y].lower_left.y
+                    == rects[x_compare, y_compare].lower_left.y
+                ):
                     index = np.where(rects == rects[x, y])
                     rects[x_compare, y_compare].width += rects[x, y].width
                     rects[index] = rects[x_compare, y_compare]
-                    print("Rectangle removed")
                     convergence = 0
             if direction[1] < 0:
-                if rects[x, y].width == rects[x_compare, y_compare].width:
+                if (
+                    rects[x, y].width == rects[x_compare, y_compare].width
+                    and rects[x_compare, y_compare].lower_left.y - rects[x, y].height
+                    == rects[x, y].lower_left.y
+                    and rects[x, y].lower_left.x
+                    == rects[x_compare, y_compare].lower_left.x
+                ):
                     index = np.where(rects == rects[x, y])
                     rects[x_compare, y_compare].height += rects[x, y].height
                     rects[index] = rects[x_compare, y_compare]
-                    print("Rectangle removed")
                     convergence = 0
 
         convergence += 1
@@ -142,3 +162,4 @@ if __name__ == "__main__":
         plot_rects(
             reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_{i}.png", show=False
         )
+        print(f"Test {i}: {len(reduced_rects)} rectangles")
