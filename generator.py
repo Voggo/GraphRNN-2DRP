@@ -76,36 +76,28 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
         ):
             # Merge the rectangles
             if direction[0] > 0:
-                if (
-                    rects[x, y].height == rects[x_compare, y_compare].height
-                ):
+                if rects[x, y].height == rects[x_compare, y_compare].height:
                     index = np.where(rects == rects[x_compare, y_compare])
                     rects[x, y].width += rects[x_compare, y_compare].width
                     rects[index] = rects[x, y]
                     convergence = 0
                     print("Rectangle removed")
             if direction[1] > 0:
-                if (
-                    rects[x, y].width == rects[x_compare, y_compare].width
-                ):
+                if rects[x, y].width == rects[x_compare, y_compare].width:
                     index = np.where(rects == rects[x_compare, y_compare])
                     rects[x, y].height += rects[x_compare, y_compare].height
                     rects[index] = rects[x, y]
                     print("Rectangle removed")
                     convergence = 0
             if direction[0] < 0:
-                if (
-                    rects[x, y].height == rects[x_compare, y_compare].height
-                ):
+                if rects[x, y].height == rects[x_compare, y_compare].height:
                     index = np.where(rects == rects[x, y])
                     rects[x_compare, y_compare].width += rects[x, y].width
                     rects[index] = rects[x_compare, y_compare]
                     print("Rectangle removed")
                     convergence = 0
             if direction[1] < 0:
-                if (
-                    rects[x, y].width == rects[x_compare, y_compare].width
-                ):
+                if rects[x, y].width == rects[x_compare, y_compare].width:
                     index = np.where(rects == rects[x, y])
                     rects[x_compare, y_compare].height += rects[x, y].height
                     rects[index] = rects[x_compare, y_compare]
