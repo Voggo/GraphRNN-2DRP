@@ -9,6 +9,11 @@ class Point:
     x: int
     y: int
 
+    def __add__(self, other: "Point") -> "Point":
+        if not isinstance(other, Point):
+            raise ValueError("You can only add another Point to this Point")
+        return Point(self.x + other.x, self.y + other.y)
+
 
 @dataclass
 class Rectangle:

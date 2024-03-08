@@ -134,6 +134,57 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
     return [rect for rect in rects_list if rect is not None]
 
 
+def convert_rects_to_graph(
+    rects: List[Rectangle],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Convert a list of Rectangles to a graph."""
+    adjacency_matrix = np.zeros((len(rects), len(rects)), dtype=int)
+    edge_directions = np.zeros((len(rects), len(rects)), dtype=tuple)
+    edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
+    for i, rect1 in enumerate(rects):
+        for j, rect2 in enumerate(rects):
+            if i == j:
+                continue
+            if (
+                rect1.lower_left.x + rect1.width == rect2.lower_left.x
+                and rect1.lower_left.y <= rect2.lower_left.y + rect2.height
+                and rect1.lower_left.y + rect1.height >= rect2.lower_left.y
+            ):
+                adjacency_matrix[i, j] = 1
+                adjacency_matrix[j, i] = 1
+                edge_directions[i, j] = (2, 4)
+                edge_directions[j, i] = (2, 4)
+                rect1_center = rect1.lower_left + Point(
+                    rect1.width / 2, rect1.height / 2
+                )
+                rect2_center = rect2.lower_left + Point(
+                    rect2.width / 2, rect2.height / 2
+                )
+                edge_angle[i, j] = np.arctan2(
+                    rect2_center.y - rect1_center.y, rect2_center.x - rect1_center.x
+                )  # need to be double checked
+            if (
+                rect1.lower_left.y + rect1.height == rect2.lower_left.y
+                and rect1.lower_left.x <= rect2.lower_left.x + rect2.width
+                and rect1.lower_left.x + rect1.width >= rect2.lower_left.x
+            ):
+                adjacency_matrix[i, j] = 1
+                adjacency_matrix[j, i] = 1
+                edge_directions[i, j] = (1, 3)
+                edge_directions[j, i] = (1, 3)
+                rect1_center = rect1.lower_left + Point(
+                    rect1.width / 2, rect1.height / 2
+                )
+                rect2_center = rect2.lower_left + Point(
+                    rect2.width / 2, rect2.height / 2
+                )
+                edge_angle[i, j] = np.arctan2(
+                    rect2_center.y - rect1_center.y, rect2_center.x - rect1_center.x
+                )  # need to be double checked
+
+    return adjacency_matrix, edge_directions, edge_angle
+
+
 def print_rects(rects: np.ndarray) -> None:
     """Print the list of rectangles."""
     for rect in rects:
@@ -156,10 +207,23 @@ def get_line_breaks(line: int, n_breaks: int) -> List[int]:
 
 
 if __name__ == "__main__":
-    for i in range(20):
-        test_rects = generate_rects(50, 50, 10)
-        reduced_rects = reduce_rects(test_rects, convergence_limit=100)
-        plot_rects(
-            reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_{i}.png", show=False
-        )
-        print(f"Test {i}: {len(reduced_rects)} rectangles")
+    # for i in range(1):
+    #     test_rects = generate_rects(50, 50, 10)
+    #     reduced_rects = reduce_rects(test_rects, convergence_limit=100)
+    #     plot_rects(
+    #         reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_{i}.png", show=False
+    #     )
+    #     print(f"Test {i}: {len(reduced_rects)} rectangles")
+
+    test_rects = generate_rects(50, 50, 10)
+    reduced_rects = reduce_rects(test_rects, convergence_limit=100)
+    plot_rects(
+        reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=True
+    )
+    print(f"Test: {len(reduced_rects)} rectangles")
+    adjacency_matrix, edge_directions, edge_angle = convert_rects_to_graph(
+        reduced_rects
+    )
+    print(adjacency_matrix)
+    print(edge_directions)
+    print(edge_angle)
