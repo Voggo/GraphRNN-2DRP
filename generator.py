@@ -185,6 +185,20 @@ def convert_rects_to_graph(
     return adjacency_matrix, edge_directions, edge_angle
 
 
+def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
+    """Convert a graph to a list of Rectangles."""
+    edge_index = np.where(adj == 1)
+    for i, j in zip(edge_index[0], edge_index[1]):
+        if i < j:
+            if nodes[i].lower_left is None:
+                nodes[i].lower_left = Point(0, 0)
+            if edge_dir[i, j] == (2, 4):
+                nodes[j].lower_left = nodes[i].lower_left + Point(nodes[i].width, 0)
+
+            if edge_dir[i, j] == (1, 3):
+                nodes[j].lower_left = nodes[i].lower_left + Point(0, nodes[i].height)
+    return nodes
+
 def print_rects(rects: np.ndarray) -> None:
     """Print the list of rectangles."""
     for rect in rects:
@@ -227,3 +241,10 @@ if __name__ == "__main__":
     print(adjacency_matrix)
     print(edge_directions)
     print(edge_angle)
+    nodes = reduced_rects
+    for node in nodes:
+        node.lower_left = None
+    rects = convert_graph_to_rects(nodes, adjacency_matrix, edge_directions, edge_angle)
+    plot_rects(
+        rects, ax_lim=60, ay_lim=60, filename=f"test_graph_to_rects.png", show=True
+    )
