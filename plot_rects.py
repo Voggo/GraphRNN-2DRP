@@ -26,11 +26,11 @@ def get_plt_rects(rects: List[Rectangle]):
     return plt_rects
 
 
-def plot_rects(rects: List[Rectangle], ax_lim=5, ay_lim=5, filename="rects.png", show=True):
+def plot_rects(rects: List[Rectangle], ax_lim=5, ay_lim=5, ax_min=0, ay_min=0, filename="rects.png", show=True):
     """Plot a list of Rectangle dataclasses."""
     _, ax = plt.subplots()
-    ax.set_xlim(0, ax_lim)
-    ax.set_ylim(0, ay_lim)
+    ax.set_xlim(ax_min, ax_lim)
+    ax.set_ylim(ay_min, ay_lim)
     plt_rects = get_plt_rects(rects)
     for plt_rect in plt_rects:
         ax.add_patch(plt_rect)

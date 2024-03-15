@@ -136,6 +136,7 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
 
 
 def center_offset(rect: Rectangle) -> Point:
+    """Return the offset of the center of a Rectangle from the lower left corner."""
     return Point(rect.width / 2, rect.height / 2)
 
 
@@ -188,9 +189,6 @@ def convert_rects_to_graph(
                 )
                 edge_angle[i, j] = angle
                 edge_angle[j, i] = angle + np.pi
-    print(np.round(adjacency_matrix - 0.1))
-    # print(edge_directions)
-    print(np.round(edge_angle))
     return adjacency_matrix, edge_directions, edge_angle
 
 
@@ -204,46 +202,42 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     q = queue.Queue()
     nodes[queue_index].lower_left = Point(0, 0)
     q.put(edge_index[0][0])
-    debug = []
-
+    debug = [nodes[edge_index[0][0]]]
+    debug[0].lower_left -= center_offset(debug[0])
     count = 0
     while not q.empty():
         node_from = q.get()
-        if visited[node_from]:
-            continue
         visited[node_from] = True
         queue_index = np.where(edge_index[0] == node_from)
         neighbours = edge_index[1][queue_index]
         for node_to in neighbours:
+            if visited[node_to] or nodes[node_to].lower_left is not None:
+                continue
             count += 1
             q.put(node_to)
-            print(f"Node from: {nodes[node_from]}, Node to: {nodes[node_to]}")
-            print(f"Edge angle: {edge_ang[node_from, node_to]}")
+            # print(f"Node from: {nodes[node_from]}, Node to: {nodes[node_to]}")
+            # print(f"Edge angle: {edge_ang[node_from, node_to]}")
             if edge_dir[node_from, node_to] == (2, 4):
-                x_offset = float(nodes[node_from].width + nodes[node_to].width) / 2
+                x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 y_offset = (
                     (x_offset * np.tan(edge_ang[node_from, node_to]))
                     if not np.isclose(edge_ang[node_from, node_to], 0, 1e-2)
                     else 0.0
                 )
-                nodes[node_to].lower_left = round(
-                    nodes[node_from].lower_left
-                    + Point(x_offset, y_offset)
-                    - center_offset(nodes[node_to])
+                nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
+                    x_offset, y_offset
                 )
-            if edge_dir[node_from, node_to] == (4, 2):
+            elif edge_dir[node_from, node_to] == (4, 2):
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 y_offset = (
                     (x_offset * np.tan(edge_ang[node_from, node_to] - np.pi))
                     if not np.isclose(edge_ang[node_from, node_to] - np.pi, 0.0, 1e-2)
                     else 0.0
                 )
-                nodes[node_to].lower_left = round(
-                    nodes[node_from].lower_left
-                    + Point(x_offset, y_offset)
-                    - center_offset(nodes[node_to])
+                nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
+                    x_offset, y_offset
                 )
-            if edge_dir[node_from, node_to] == (1, 3):
+            elif edge_dir[node_from, node_to] == (1, 3):
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 x_offset = (
                     -1 * (y_offset * np.tan(edge_ang[node_from, node_to] - (np.pi / 2)))
@@ -252,12 +246,10 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                     )
                     else 0.0
                 )
-                nodes[node_to].lower_left = round(
-                    nodes[node_from].lower_left
-                    + Point(x_offset, y_offset)
-                    - center_offset(nodes[node_to])
+                nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
+                    x_offset, y_offset
                 )
-            if edge_dir[node_from, node_to] == (3, 1):
+            elif edge_dir[node_from, node_to] == (3, 1):
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 x_offset = (
                     y_offset * np.tan(edge_ang[node_from, node_to] + (np.pi / 2))
@@ -266,20 +258,29 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                     )
                     else 0.0
                 )
-                nodes[node_to].lower_left = round(
-                    nodes[node_from].lower_left
-                    + Point(x_offset, y_offset)
-                    - center_offset(nodes[node_to])
+                nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
+                    x_offset, y_offset
                 )
-            debug.append(nodes[node_to])
+            temp = nodes[node_to]
+            temp.lower_left = temp.lower_left - center_offset(temp)
+            debug.append(temp)
             plot_rects(
                 debug,
-                ax_lim=100,
-                ay_lim=100,
+                ax_lim=50,
+                ay_lim=50,
+                ax_min=-50,
+                ay_min=-50,
                 filename=f"debug_graph_to_rects_{count}.png",
                 show=False,
             )
     return nodes
+
+
+def convert_center_to_lower_left(rects: List[Rectangle]) -> List[Rectangle]:
+    """Convert the center of a list of Rectangles to the lower left corner."""
+    for rect in rects:
+        rect.lower_left = rect.lower_left - center_offset(rect)
+    return rects
 
 
 def print_rects(rects: np.ndarray) -> None:
@@ -312,10 +313,15 @@ if __name__ == "__main__":
     #     )
     #     print(f"Test {i}: {len(reduced_rects)} rectangles")
 
-    test_rects = generate_rects(50, 50, 7)
+    test_rects = generate_rects(50, 50, 5)
     reduced_rects = reduce_rects(test_rects, convergence_limit=100)
     plot_rects(
-        reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=False
+        reduced_rects,
+        ax_lim=50,
+        ay_lim=50,
+        ax_min=-50,
+        ay_min=-50,
+        filename=f"test_graph.png", show=False
     )
     # print(f"Test: {len(reduced_rects)} rectangles")
     adjacency_matrix, edge_directions, edge_angle = convert_rects_to_graph(
@@ -334,6 +340,7 @@ if __name__ == "__main__":
     rects_again = convert_graph_to_rects(
         nodes, adjacency_matrix, edge_directions, edge_angle
     )
+    rects_again = convert_center_to_lower_left(rects_again)
     plot_rects(
         rects_again,
         ax_lim=60,
