@@ -58,3 +58,6 @@ class Rectangle:
             and self.rotation == __value.rotation
             and self.lower_left == __value.lower_left
         )
+        
+    def __copy__(self) -> "Rectangle":
+        return Rectangle(self.width, self.height, self.rotation, self.lower_left)
