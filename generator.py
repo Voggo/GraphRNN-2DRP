@@ -187,8 +187,8 @@ def convert_rects_to_graph(
                 angle = np.arctan2(
                     rect2_center.x - rect1_center.x, rect2_center.y - rect1_center.y
                 )
-                edge_angle[i, j] = angle
-                edge_angle[j, i] = angle + np.pi
+                edge_angle[i, j] = angle - (np.pi / 2)
+                edge_angle[j, i] = angle + (np.pi / 2)
     return adjacency_matrix, edge_directions, edge_angle
 
 
@@ -202,8 +202,8 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     q = queue.Queue()
     nodes[queue_index].lower_left = Point(0, 0)
     q.put(edge_index[0][0])
-    debug = [nodes[edge_index[0][0]]]
-    debug[0].lower_left -= center_offset(debug[0])
+    # debug = [nodes[edge_index[0][0]]]
+    # debug[0].lower_left -= center_offset(debug[0])
     count = 0
     while not q.empty():
         node_from = q.get()
@@ -261,18 +261,18 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
-            temp = nodes[node_to]
-            temp.lower_left = temp.lower_left - center_offset(temp)
-            debug.append(temp)
-            plot_rects(
-                debug,
-                ax_lim=50,
-                ay_lim=50,
-                ax_min=-50,
-                ay_min=-50,
-                filename=f"debug_graph_to_rects_{count}.png",
-                show=False,
-            )
+            # temp = nodes[node_to]
+            # temp.lower_left = temp.lower_left - center_offset(temp)
+            # debug.append(temp)
+            # plot_rects(
+            #     debug,
+            #     ax_lim=50,
+            #     ay_lim=50,
+            #     ax_min=-50,
+            #     ay_min=-50,
+            #     filename=f"debug_graph_to_rects_{count}.png",
+            #     show=False,
+            # )
     return nodes
 
 
@@ -314,13 +314,11 @@ if __name__ == "__main__":
     #     print(f"Test {i}: {len(reduced_rects)} rectangles")
 
     test_rects = generate_rects(50, 50, 5)
-    reduced_rects = reduce_rects(test_rects, convergence_limit=100)
+    reduced_rects = reduce_rects(test_rects, convergence_limit=50)
     plot_rects(
         reduced_rects,
         ax_lim=50,
         ay_lim=50,
-        ax_min=-50,
-        ay_min=-50,
         filename=f"test_graph.png", show=False
     )
     # print(f"Test: {len(reduced_rects)} rectangles")
@@ -334,7 +332,9 @@ if __name__ == "__main__":
     #     print(f"Angle between {i} and {j}: {edge_angle[i, j]}")
     #     print(f"Angle between {j} and {i}: {edge_angle[j, i]}")
     #     print(edge_angle[i, j] - edge_angle[j, i])
-    nodes = reduced_rects
+    nodes = []
+    for rect in reduced_rects:
+        nodes.append(rect.__copy__())
     for node in nodes:
         node.lower_left = None
     rects_again = convert_graph_to_rects(
