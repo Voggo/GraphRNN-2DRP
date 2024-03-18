@@ -9,7 +9,18 @@ class Point:
     x: int
     y: int
 
+    def __add__(self, other: "Point") -> "Point":
+        if not isinstance(other, Point):
+            raise ValueError("You can only add another Point to this Point")
+        return Point(self.x + other.x, self.y + other.y)
 
+    def __sub__ (self, other: "Point") -> "Point":
+        if not isinstance(other, Point):
+            raise ValueError("You can only subtract another Point from this Point")
+        return Point(self.x - other.x, self.y - other.y)
+
+    def __round__(self, n = None) -> "Point":
+        return Point(round(self.x, n), round(self.y, n))
 @dataclass
 class Rectangle:
     """A rectangle defined by its lower left corner, width, height, and rotation."""
@@ -47,3 +58,6 @@ class Rectangle:
             and self.rotation == __value.rotation
             and self.lower_left == __value.lower_left
         )
+        
+    def __copy__(self) -> "Rectangle":
+        return Rectangle(self.width, self.height, self.rotation, self.lower_left)
