@@ -6,6 +6,7 @@ import copy
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
+from utils import *
 
 
 
@@ -27,17 +28,6 @@ def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
         y_axis += 1
         x_axis = 0
     return rectangles
-
-
-# might not be needed anymore
-def rectangles_overlap(rect1: Rectangle, rect2: Rectangle) -> bool:
-    """Check if two rectangles overlap."""
-    return (
-        rect1.lower_left.x < rect2.lower_left.x + rect2.width
-        and rect1.lower_left.x + rect1.width > rect2.lower_left.x
-        and rect1.lower_left.y < rect2.lower_left.y + rect2.height
-        and rect1.lower_left.y + rect1.height > rect2.lower_left.y
-    )
 
 
 def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
@@ -136,12 +126,6 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
     rects_list = list(set(rects_list))
     return [rect for rect in rects_list if rect is not None]
 
-
-def center_offset(rect: Rectangle) -> Point:
-    """Return the offset of the center of a Rectangle from the lower left corner."""
-    return Point(rect.width / 2, rect.height / 2)
-
-
 def convert_rects_to_graph(
     rects: List[Rectangle],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -210,8 +194,6 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     q = queue.Queue()
     nodes[queue_index].lower_left = Point(0, 0)
     q.put(edge_index[0][0])
-    debug = [nodes[edge_index[0][0]].__copy__()]
-    debug[0].lower_left -= center_offset(debug[0])
     count = 0
     while not q.empty():
         node_from = q.get()
@@ -223,8 +205,6 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 continue
             count += 1
             q.put(node_to)
-            # print(f"Node from: {nodes[node_from]}, Node to: {nodes[node_to]}")
-            # print(f"Edge angle: {edge_ang[node_from, node_to]}")
             if edge_dir[node_from, node_to] == (2, 4):
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 y_offset = (
@@ -265,77 +245,22 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -1 * x_offset, -1 * y_offset
                 )
-            temp = nodes[node_to].__copy__()
-            temp.lower_left = temp.lower_left - center_offset(temp)
-            debug.append(temp)
-            plot_rects(
-                debug,
-                ax_lim=50,
-                ay_lim=50,
-                ax_min=-50,
-                ay_min=-50,
-                filename=f"debug_graph_to_rects_{count}.png",
-                show=False,
-            )
     return nodes
 
 
-def convert_center_to_lower_left(rects: List[Rectangle]) -> List[Rectangle]:
-    """Convert the center of a list of Rectangles to the lower left corner."""
-    for rect in rects:
-        rect.lower_left = rect.lower_left - center_offset(rect)
-    return rects
-
-
-def print_rects(rects: np.ndarray) -> None:
-    """Print the list of rectangles."""
-    for rect in rects:
-        print(rect)
-
-
-def get_line_breaks(line: int, n_breaks: int) -> List[int]:
-    """Return a list of n_breaks random line breaks."""
-    if line <= 1 or n_breaks == 0:
-        return []
-    result = []
-    for _ in range(n_breaks):
-        while True:
-            randnum = random.randint(1, line - 1)
-            if randnum not in result:
-                result.append(randnum)
-                break
-    result.sort()
-    return result
-
-
 if __name__ == "__main__":
-    # for i in range(1):
-    #     test_rects = generate_rects(50, 50, 10)
-    #     reduced_rects = reduce_rects(test_rects, convergence_limit=100)
-    #     plot_rects(
-    #         reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_{i}.png", show=False
-    #     )
-    #     print(f"Test {i}: {len(reduced_rects)} rectangles")
-
-    test_rects = generate_rects(50, 50, 5)
-    reduced_rects = reduce_rects(test_rects, convergence_limit=50)
+    test_rects = generate_rects(50, 50, 7)
+    reduced_rects = reduce_rects(test_rects, convergence_limit=100)
     plot_rects(
         reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=False
     )
-    # print(f"Test: {len(reduced_rects)} rectangles")
     adjacency_matrix, edge_directions, edge_angle = convert_rects_to_graph(
         reduced_rects
     )
-    # print(adjacency_matrix)
-    # print(edge_directions)
     index = np.where(edge_angle != 0)
-    # for i, j in zip(index[0], index[1]):
-    #     print(f"Angle between {i} and {j}: {edge_angle[i, j]}")
-    #     print(f"Angle between {j} and {i}: {edge_angle[j, i]}")
-    #     print(edge_angle[i, j] - edge_angle[j, i])
     nodes = []
     for rect in reduced_rects:
-        nodes.append(rect.__copy__())
+        nodes.append(copy.copy(rect))
     for node in nodes:
         node.lower_left = None
     rects_again = convert_graph_to_rects(
@@ -344,8 +269,10 @@ if __name__ == "__main__":
     rects_again = convert_center_to_lower_left(rects_again)
     plot_rects(
         rects_again,
-        ax_lim=60,
-        ay_lim=60,
+        ax_min=-50,
+        ay_min=-50,
+        ax_lim=50,
+        ay_lim=50,
         filename=f"test_graph_to_rects.png",
         show=True,
     )
