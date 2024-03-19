@@ -1,13 +1,12 @@
 from typing import List
 import random
-import numpy as np
 import queue
 import copy
+import numpy as np
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
-
 
 
 def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
@@ -30,7 +29,7 @@ def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     return rectangles
 
 
-def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
+def reduce_rects(rects: np.ndarray, convergence_limit=100) -> List[Rectangle]:
     """Return a list of randomly reduced Rectangles from a list of Rectangles."""
 
     convergence = 0
@@ -126,6 +125,7 @@ def reduce_rects(rects: np.ndarray, convergence_limit=1000) -> List[Rectangle]:
     rects_list = list(set(rects_list))
     return [rect for rect in rects_list if rect is not None]
 
+
 def convert_rects_to_graph(
     rects: List[Rectangle],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -135,8 +135,8 @@ def convert_rects_to_graph(
     edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
     for i, rect1 in enumerate(rects):
         for j, rect2 in enumerate(rects):
-            # if i > j:
-            #     continue
+            if i > j:
+                continue
             if (
                 (
                     rect1.lower_left.x + rect1.width == rect2.lower_left.x
@@ -186,7 +186,6 @@ def convert_rects_to_graph(
 
 def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     """Convert a graph to a list of Rectangles."""
-    # adj = np.triu(adj)
     print(adj)
     edge_index = np.where(adj == 1)
     queue_index = edge_index[0][0]
@@ -248,16 +247,28 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     return nodes
 
 
-if __name__ == "__main__":
-    test_rects = generate_rects(50, 50, 7)
-    reduced_rects = reduce_rects(test_rects, convergence_limit=100)
-    plot_rects(
-        reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=False
-    )
+def generate_rects_and_graphs(
+    width: int, height: int, n_breaks: int, convergence_limit=100
+) -> tuple:
+    """Generate a list of Rectangles and convert it to a graph."""
+    rects = generate_rects(width, height, n_breaks)
+    reduced_rects = reduce_rects(rects, convergence_limit=100)
+    if len(reduced_rects) == 1:
+        rects = generate_rects(width, height, n_breaks)
+        reduced_rects = reduce_rects(rects, convergence_limit=100)
     adjacency_matrix, edge_directions, edge_angle = convert_rects_to_graph(
         reduced_rects
     )
-    index = np.where(edge_angle != 0)
+    return reduced_rects, adjacency_matrix, edge_directions, edge_angle
+
+
+if __name__ == "__main__":
+    reduced_rects, adjacency_matrix, edge_directions, edge_angle = (
+        generate_rects_and_graphs(50, 50, 7)
+    )
+    plot_rects(
+        reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=False
+    )
     nodes = []
     for rect in reduced_rects:
         nodes.append(copy.copy(rect))
