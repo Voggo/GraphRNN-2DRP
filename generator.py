@@ -3,6 +3,8 @@ import random
 import queue
 import copy
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
@@ -262,6 +264,15 @@ def generate_rects_and_graphs(
     return reduced_rects, adjacency_matrix, edge_directions, edge_angle
 
 
+def show_graph_with_labels(adjacency_matrix, mylabels):
+    rows, cols = np.where(adjacency_matrix == 1)
+    edges = zip(rows.tolist(), cols.tolist())
+    gr = nx.Graph()
+    gr.add_edges_from(edges)
+    nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
+    plt.show()
+
+
 if __name__ == "__main__":
     reduced_rects, adjacency_matrix, edge_directions, edge_angle = (
         generate_rects_and_graphs(50, 50, 7)
@@ -287,3 +298,4 @@ if __name__ == "__main__":
         filename=f"test_graph_to_rects.png",
         show=True,
     )
+    show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
