@@ -10,7 +10,7 @@ def get_plt_rects(rects: List[Rectangle]):
     for rect in rects:
         try:
             if rect.lower_left is None:
-                raise ValueError(f"Rectangle ({rect}) must have a lower_left attribute.")
+                raise ValueError(f"Rectangle ({rect}) did not have a lower_left attribute.")
             plt_rect = plt_Rectangle(
                 (rect.lower_left.x, rect.lower_left.y) if rect.lower_left else (0, 0),
                 rect.width,
@@ -33,6 +33,14 @@ def plot_rects(rects: List[Rectangle], ax_lim=5, ay_lim=5, ax_min=0, ay_min=0, f
     ax.set_ylim(ay_min, ay_lim)
     plt_rects = get_plt_rects(rects)
     for plt_rect in plt_rects:
+        ax.text(
+            plt_rect.get_x() + plt_rect.get_width() / 2,
+            plt_rect.get_y() + plt_rect.get_height() / 2,
+            f"{plt_rects.index(plt_rect)}",
+            ha="center",
+            va="center",
+            color="black",
+        )
         ax.add_patch(plt_rect)
     plt.savefig(f"plots_img/{filename}", )  # Save the figure before showing it
     if show:

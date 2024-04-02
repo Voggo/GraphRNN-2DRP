@@ -10,7 +10,7 @@ from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
 
-
+# random.seed(5)
 def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
     if width <= 0 or height <= 0 or n_breaks <= 0:
@@ -135,9 +135,11 @@ def convert_rects_to_graph(
     adjacency_matrix = np.zeros((len(rects), len(rects)), dtype=int)
     edge_directions = np.zeros((len(rects), len(rects)), dtype=tuple)
     edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
-    for i, rect1 in enumerate(rects):
-        for j, rect2 in enumerate(rects):
-            if i > j:
+    for i, rect1_enum in enumerate(rects):
+        for j, rect2_enum in enumerate(rects):
+            index_i, index_j = i, j
+            rect1, rect2 = copy.copy(rect1_enum), copy.copy(rect2_enum)
+            if i == j:
                 continue
             if (
                 (
@@ -148,19 +150,19 @@ def convert_rects_to_graph(
                 and rect1.lower_left.y + rect1.height > rect2.lower_left.y
             ):
                 if rect1.lower_left.x - rect2.width == rect2.lower_left.x:
-                    i, j = j, i
+                    index_i, index_j = index_j, index_i
                     rect1, rect2 = copy.copy(rect2), copy.copy(rect1)
-                adjacency_matrix[i, j] = 1
-                adjacency_matrix[j, i] = 1
-                edge_directions[i, j] = (2, 4)
-                edge_directions[j, i] = (4, 2)
+                adjacency_matrix[index_i, index_j] = 1
+                adjacency_matrix[index_j, index_i] = 1
+                edge_directions[index_i, index_j] = (2, 4)
+                edge_directions[index_j, index_i] = (4, 2)
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
                 angle = np.arctan2(
                     rect2_center.y - rect1_center.y, rect2_center.x - rect1_center.x
                 )
-                edge_angle[i, j] = angle
-                edge_angle[j, i] = angle
+                edge_angle[index_i, index_j] = angle
+                edge_angle[index_j, index_i] = angle
             elif (
                 (
                     rect1.lower_left.y + rect1.height == rect2.lower_left.y
@@ -170,19 +172,19 @@ def convert_rects_to_graph(
                 and rect1.lower_left.x + rect1.width > rect2.lower_left.x
             ):
                 if rect1.lower_left.y - rect2.height == rect2.lower_left.y:
-                    i, j = j, i
+                    index_i, index_j = index_j, index_i
                     rect1, rect2 = copy.copy(rect2), copy.copy(rect1)
-                adjacency_matrix[i, j] = 1
-                adjacency_matrix[j, i] = 1
-                edge_directions[i, j] = (1, 3)
-                edge_directions[j, i] = (3, 1)
+                adjacency_matrix[index_i, index_j] = 1
+                adjacency_matrix[index_j, index_i] = 1
+                edge_directions[index_i, index_j] = (1, 3)
+                edge_directions[index_j, index_i] = (3, 1)
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
                 angle = np.arctan2(
                     rect2_center.x - rect1_center.x, rect2_center.y - rect1_center.y
                 )
-                edge_angle[i, j] = angle
-                edge_angle[j, i] = angle
+                edge_angle[index_i, index_j] = angle
+                edge_angle[index_j, index_i] = angle
     return adjacency_matrix, edge_directions, edge_angle
 
 
