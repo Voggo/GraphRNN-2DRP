@@ -13,6 +13,8 @@ def center_offset(rect: Rectangle) -> Point:
 def convert_center_to_lower_left(rects: List[Rectangle]) -> List[Rectangle]:
     """Convert the center of a list of Rectangles to the lower left corner."""
     for rect in rects:
+        if rect.lower_left is None:
+            continue
         rect.lower_left = rect.lower_left - center_offset(rect)
     return rects
 
