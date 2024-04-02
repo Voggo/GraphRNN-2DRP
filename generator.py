@@ -272,6 +272,7 @@ def show_graph_with_labels(adjacency_matrix, mylabels):
     gr = nx.Graph()
     gr.add_edges_from(edges)
     nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
+    plt.savefig(f"plots_img/graph", )
     plt.show()
 
 
