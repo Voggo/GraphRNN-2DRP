@@ -274,9 +274,12 @@ def show_graph_with_labels(adjacency_matrix, mylabels):
 
 
 if __name__ == "__main__":
-    reduced_rects, adjacency_matrix, edge_directions, edge_angle = (
-        generate_rects_and_graphs(50, 50, 7)
-    )
+    (
+        reduced_rects,
+        adjacency_matrix,
+        edge_directions,
+        edge_angle,
+    ) = generate_rects_and_graphs(50, 50, 7)
     plot_rects(
         reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=False
     )
