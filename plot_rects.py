@@ -10,7 +10,9 @@ def get_plt_rects(rects: List[Rectangle]):
     for rect in rects:
         try:
             if rect.lower_left is None:
-                raise ValueError(f"Rectangle ({rect}) did not have a lower_left attribute.")
+                raise ValueError(
+                    f"Rectangle ({rect}) did not have a lower_left attribute."
+                )
             plt_rect = plt_Rectangle(
                 (rect.lower_left.x, rect.lower_left.y) if rect.lower_left else (0, 0),
                 rect.width,
@@ -26,7 +28,15 @@ def get_plt_rects(rects: List[Rectangle]):
     return plt_rects
 
 
-def plot_rects(rects: List[Rectangle], ax_lim=5, ay_lim=5, ax_min=0, ay_min=0, filename="rects.png", show=True):
+def plot_rects(
+    rects: List[Rectangle],
+    ax_lim=5,
+    ay_lim=5,
+    ax_min=0,
+    ay_min=0,
+    filename="rects.png",
+    show=True,
+):
     """Plot a list of Rectangle dataclasses."""
     _, ax = plt.subplots()
     ax.set_xlim(ax_min, ax_lim)
@@ -42,7 +52,9 @@ def plot_rects(rects: List[Rectangle], ax_lim=5, ay_lim=5, ax_min=0, ay_min=0, f
             color="black",
         )
         ax.add_patch(plt_rect)
-    plt.savefig(f"plots_img/{filename}", )  # Save the figure before showing it
+    plt.savefig(
+        f"plots_img/{filename}",
+    )  # Save the figure before showing it
     if show:
         plt.show()
 
