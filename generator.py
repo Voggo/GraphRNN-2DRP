@@ -272,7 +272,7 @@ def show_graph_with_labels(adjacency_matrix, mylabels):
     gr = nx.Graph()
     gr.add_edges_from(edges)
     nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
-    plt.savefig(f"plots_img/graph", )
+    plt.savefig("plots_img/graph", )
     plt.show()
 
 
@@ -284,7 +284,7 @@ if __name__ == "__main__":
         edge_angle,
     ) = generate_rects_and_graphs(50, 50, 7)
     plot_rects(
-        reduced_rects, ax_lim=50, ay_lim=50, filename=f"test_graph.png", show=False
+        reduced_rects, ax_lim=50, ay_lim=50, filename="test_graph.png", show=False
     )
     nodes = []
     for rect in reduced_rects:
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         ay_min=-50,
         ax_lim=50,
         ay_lim=50,
-        filename=f"test_graph_to_rects.png",
+        filename="test_graph_to_rects.png",
         show=True,
     )
     show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
