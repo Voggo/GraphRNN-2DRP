@@ -251,7 +251,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     return nodes
 
 
-def generate_rects_and_graphs(
+def generate_rects_and_graph(
     width: int, height: int, n_breaks: int, convergence_limit=100
 ) -> tuple:
     """Generate a list of Rectangles and convert it to a graph."""
@@ -282,7 +282,7 @@ if __name__ == "__main__":
         adjacency_matrix,
         edge_directions,
         edge_angle,
-    ) = generate_rects_and_graphs(50, 50, 6)
+    ) = generate_rects_and_graph(50, 50, 6)
     plot_rects(
         reduced_rects, ax_lim=50, ay_lim=50, filename="test_graph.png", show=False
     )

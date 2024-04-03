@@ -1,3 +1,4 @@
+import numpy as np
 from dataclasses import dataclass
 from typing import Optional
 
@@ -14,13 +15,15 @@ class Point:
             raise ValueError("You can only add another Point to this Point")
         return Point(self.x + other.x, self.y + other.y)
 
-    def __sub__ (self, other: "Point") -> "Point":
+    def __sub__(self, other: "Point") -> "Point":
         if not isinstance(other, Point):
             raise ValueError("You can only subtract another Point from this Point")
         return Point(self.x - other.x, self.y - other.y)
 
-    def __round__(self, n = None) -> "Point":
+    def __round__(self, n=None) -> "Point":
         return Point(round(self.x, n), round(self.y, n))
+
+
 @dataclass
 class Rectangle:
     """A rectangle defined by its lower left corner, width, height, and rotation."""
@@ -29,6 +32,10 @@ class Rectangle:
     height: int
     rotation: int = 0
     lower_left: Optional[Point] = None
+
+    def get_as_node(self) -> np.ndarray:
+        """Return the rectangle as a node in the graph."""
+        return np.array([self.width, self.height, self.rotation])
 
     def __hash__(self) -> int:
         if self.lower_left is None:
@@ -58,6 +65,6 @@ class Rectangle:
             and self.rotation == __value.rotation
             and self.lower_left == __value.lower_left
         )
-        
+
     def __copy__(self) -> "Rectangle":
         return Rectangle(self.width, self.height, self.rotation, self.lower_left)
