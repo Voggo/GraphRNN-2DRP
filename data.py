@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 import networkx as nx
 from generator import generate_rects_and_graph
 
@@ -43,11 +42,11 @@ class Dataset(torch.utils.data.Dataset):
         return self.num_graphs
 
     def __getitem__(self, index):
-        x = self.data_nodes[index]
+        x = torch.tensor(self.data_nodes[index])
         y = {}
-        y["adj"] = self.data_adj[index]
-        y["edge_dir"] = self.data_edge_dir[index]
-        y["edge_angle"] = self.data_edge_angle[index]
+        y["adj"] = torch.tensor(self.data_adj[index])
+        # y["edge_dir"] = torch.tensor(self.data_edge_dir[index])
+        y["edge_angle"] = torch.tensor(self.data_edge_angle[index])
         return x, y
 
 
@@ -55,10 +54,3 @@ if __name__ == "__main__":
     data = Dataset(10, 100, 100)
     x, y = data[0]
     adj = y["adj"]
-    rows, cols = np.where(adj == 1)
-    edges = zip(rows.tolist(), cols.tolist())
-    gr = nx.Graph()
-    gr.add_edges_from(edges)
-    mylabels = {i: i for i in range(len(x))}
-    nx.draw(gr, node_size=500, labels=mylabels, with_labels=True)
-    plt.show()

@@ -10,7 +10,7 @@ from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
 
-# random.seed(5)
+random.seed(7)
 def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
     if width <= 0 or height <= 0 or n_breaks <= 0:
@@ -275,6 +275,14 @@ def show_graph_with_labels(adjacency_matrix, mylabels):
     plt.savefig("plots_img/graph", )
     plt.show()
 
+def bfs_index(adj, start):
+    """return the index of the nodes in bfs order"""
+    graph = nx.from_numpy_array(adj)
+    bfs_edges = nx.bfs_edges(graph, start)
+    nodes = [start] + [v for u, v in bfs_edges]
+    print(nodes)
+    return nodes
+
 
 if __name__ == "__main__":
     (
@@ -291,8 +299,18 @@ if __name__ == "__main__":
         nodes.append(copy.copy(rect))
     for node in nodes:
         node.lower_left = None
+    # rects_again = convert_graph_to_rects(
+    #     nodes, adjacency_matrix, edge_directions, edge_angle
+    # )
+    bfs_order = bfs_index(adjacency_matrix, 0)
+    bfs_nodes = ([nodes[i] for i in bfs_order])
+    bfs_adj = adjacency_matrix[np.ix_(bfs_order, bfs_order)]
+    bfs_edge_dir = edge_directions[np.ix_(bfs_order, bfs_order)]
+    bfs_edge_angle = edge_angle[np.ix_(bfs_order, bfs_order)]
+    # show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
+
     rects_again = convert_graph_to_rects(
-        nodes, adjacency_matrix, edge_directions, edge_angle
+        bfs_nodes, bfs_adj, bfs_edge_dir, bfs_edge_angle
     )
     rects_again = convert_center_to_lower_left(rects_again)
     plot_rects(
@@ -304,4 +322,7 @@ if __name__ == "__main__":
         filename="test_graph_to_rects.png",
         show=True,
     )
-    show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
+    show_graph_with_labels(bfs_adj, {i: i for i in range(len(bfs_nodes))})
+    
+    print(bfs_adj)
+    
