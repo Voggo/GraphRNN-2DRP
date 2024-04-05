@@ -71,15 +71,15 @@ def train_rnn_mlp(
             if epoch % 5 == 0:
                 print(loss.item())
 
-    torch.save(rnn.state_dict(), "rnn_model.pth")
-    torch.save(mlp.state_dict(), "mlp_model.pth")
+    torch.save(rnn.state_dict(), f"models/rnn_model_{max_num_nodes}.pth")
+    torch.save(mlp.state_dict(), f"models/mlp_model_{max_num_nodes}.pth")
 
     return rnn, mlp, loss_sum
 
 
-def test_rnn_mlp(device, training_data, rnn, mlp):
-    rnn.load_state_dict(torch.load("rnn_model.pth"))
-    mlp.load_state_dict(torch.load("mlp_model.pth"))
+def test_rnn_mlp(device, training_data, max_num_nodes, rnn, mlp):
+    rnn.load_state_dict(torch.load(f"models/rnn_model_{max_num_nodes}.pth"))
+    mlp.load_state_dict(torch.load(f"models/mlp_model_{max_num_nodes}.pth"))
     rnn.eval()
     mlp.eval()
     loss_sum = 0
@@ -100,8 +100,8 @@ def test_rnn_mlp(device, training_data, rnn, mlp):
 
 
 def test_inference_rnn_mlp(device, rnn, mlp, max_num_nodes, batch_size=1):
-    rnn.load_state_dict(torch.load("rnn_model.pth"))
-    mlp.load_state_dict(torch.load("mlp_model.pth"))
+    rnn.load_state_dict(torch.load(f"models/rnn_model_{max_num_nodes}.pth"))
+    mlp.load_state_dict(torch.load(f"models/mlp_model_{max_num_nodes}.pth"))
     rnn.eval()
     mlp.eval()
     rnn.hidden = rnn.init_hidden(batch_size)
@@ -110,10 +110,11 @@ def test_inference_rnn_mlp(device, rnn, mlp, max_num_nodes, batch_size=1):
     for i in range(max_num_nodes):
         output = rnn(x_step)
         output = mlp(output)
-        y_pred[:, i : i + 1, :] = F.sigmoid(output)
+        y_pred[:, i : i + 1, :] = torch.bernoulli(F.sigmoid(output))
         x_step = torch.round(y_pred[:, i : i + 1, :])
         rnn.hidden = rnn.hidden.data
-    print(torch.round(y_pred[0]))
+    for i in range(batch_size):
+        print(torch.round(y_pred[i]))
 
 
 if __name__ == "__main__":
@@ -122,7 +123,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     learning_rate = 0.001
-    epochs = 2000
+    epochs = 1000
     batch_size = 12
 
     data = Dataset(120, 100, 100)
@@ -137,11 +138,12 @@ if __name__ == "__main__":
     rnn = RNN(max_num_nodes, 32, 3).to(device)
     mlp = MLP(32, 16, max_num_nodes).to(device)
 
-    if os.path.isfile(f"rnn_model.pth_{max_num_nodes}") and os.path.isfile(f"mlp_model_{max_num_nodes}.pth"):
+    if not os.path.isfile(f"models/rnn_model.pth_{max_num_nodes}") or not os.path.isfile(
+        f"models/mlp_model_{max_num_nodes}.pth"
+    ):
         rnn, mlp, loss_sum = train_rnn_mlp(
             rnn, mlp, device, learning_rate, epochs, max_num_nodes, training_data
         )
 
-    # test_rnn_mlp(device, training_data, rnn, mlp)
+    # test_rnn_mlp(device, training_data, max_num_nodes, rnn, mlp)
     test_inference_rnn_mlp(device, rnn, mlp, max_num_nodes, batch_size=batch_size)
-    
