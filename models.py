@@ -33,7 +33,7 @@ for batch, y in training_data:
 class RNN(torch.nn.Module):
     def __init__(self, input_size, hidden_size, num_layers,):
         super(RNN, self).__init__()
-        self.rnn = torch.nn.GRU(batch_first=True)
+        self.rnn = torch.nn.GRU(, batch_first=True)
         self.out = torch.nn.Linear(100, 1)
 
 
