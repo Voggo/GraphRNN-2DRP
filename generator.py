@@ -10,7 +10,7 @@ from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
 
-# random.seed(7)
+random.seed(7)
 def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
     if width <= 0 or height <= 0 or n_breaks <= 0:
@@ -133,7 +133,7 @@ def convert_rects_to_graph(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Convert a list of Rectangles to a graph."""
     adjacency_matrix = np.zeros((len(rects), len(rects)), dtype=int)
-    edge_directions = np.zeros((len(rects), len(rects), 2), dtype=int)
+    edge_directions = np.zeros((len(rects), len(rects)), dtype=tuple)
     edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
     for i, rect1_enum in enumerate(rects):
         for j, rect2_enum in enumerate(rects):
@@ -154,8 +154,8 @@ def convert_rects_to_graph(
                     rect1, rect2 = copy.copy(rect2), copy.copy(rect1)
                 adjacency_matrix[index_i, index_j] = 1
                 adjacency_matrix[index_j, index_i] = 1
-                edge_directions[index_i, index_j] = np.array([2, 4])
-                edge_directions[index_j, index_i] = np.array([4, 2])
+                edge_directions[index_i, index_j] = (2, 4)
+                edge_directions[index_j, index_i] = (4, 2)
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
                 angle = np.arctan2(
@@ -176,8 +176,8 @@ def convert_rects_to_graph(
                     rect1, rect2 = copy.copy(rect2), copy.copy(rect1)
                 adjacency_matrix[index_i, index_j] = 1
                 adjacency_matrix[index_j, index_i] = 1
-                edge_directions[index_i, index_j] = np.array([1, 3])
-                edge_directions[index_j, index_i] = np.array([3, 1])
+                edge_directions[index_i, index_j] = (1, 3)
+                edge_directions[index_j, index_i] = (3, 1)
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
                 angle = np.arctan2(
@@ -208,7 +208,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 continue
             count += 1
             q.put(node_to)
-            if np.array_equal(edge_dir[node_from, node_to, :], np.array([2, 4])):
+            if edge_dir[node_from, node_to] == (2, 4):
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 y_offset = (
                     (x_offset * np.tan(edge_ang[node_from, node_to]))
@@ -218,7 +218,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
-            elif np.array_equal(edge_dir[node_from, node_to, :], np.array([4, 2])):
+            elif edge_dir[node_from, node_to] == (4, 2):
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 y_offset = (
                     (x_offset * np.tan(edge_ang[node_from, node_to]))
@@ -228,7 +228,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -1 * x_offset, -1 * y_offset
                 )
-            elif np.array_equal(edge_dir[node_from, node_to, :], np.array([1, 3])):
+            elif edge_dir[node_from, node_to] == (1, 3):
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 x_offset = (
                     y_offset * np.tan(edge_ang[node_from, node_to])
@@ -238,7 +238,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
-            elif np.array_equal(edge_dir[node_from, node_to, :], np.array([3, 1])):
+            elif edge_dir[node_from, node_to] == (3, 1):
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 x_offset = (
                     y_offset * np.tan(edge_ang[node_from, node_to])
@@ -257,7 +257,7 @@ def generate_rects_and_graph(
     """Generate a list of Rectangles and convert it to a graph."""
     rects = generate_rects(width, height, n_breaks)
     reduced_rects = reduce_rects(rects, convergence_limit=100)
-    while len(reduced_rects) == 1:
+    if len(reduced_rects) == 1:
         rects = generate_rects(width, height, n_breaks)
         reduced_rects = reduce_rects(rects, convergence_limit=100)
     adjacency_matrix, edge_directions, edge_angle = convert_rects_to_graph(
@@ -275,13 +275,14 @@ def show_graph_with_labels(adjacency_matrix, mylabels):
     plt.savefig("plots_img/graph", )
     plt.show()
 
-def bfs_index(adj, start): # redundent just for testing
+def bfs_index(adj, start):
     """return the index of the nodes in bfs order"""
     graph = nx.from_numpy_array(adj)
     bfs_edges = nx.bfs_edges(graph, start)
     nodes = [start] + [v for u, v in bfs_edges]
     print(nodes)
     return nodes
+
 
 if __name__ == "__main__":
     (
