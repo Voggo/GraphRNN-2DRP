@@ -13,7 +13,7 @@ class RNN(torch.nn.Module):
         num_layers,
     ):
         super(RNN, self).__init__()
-        self.rnn = torch.nn.GRU(, batch_first=True)
+        self.rnn = torch.nn.GRU(batch_first=True)
         self.out = torch.nn.Linear(100, 1)
 
 
