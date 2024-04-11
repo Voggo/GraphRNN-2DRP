@@ -80,8 +80,8 @@ def train_rnn_mlp(
             loss.backward()
             optimizer_rnn.step()
             optimizer_mlp.step()
-            if epoch % 5 == 0:
-                print(loss.item())
+        if epoch % 5 == 0:
+            print(f"epoch: {epoch}, loss: {loss.item()}")
 
     torch.save(rnn.state_dict(), f"models/rnn_model_{max_num_nodes}.pth")
     torch.save(mlp.state_dict(), f"models/mlp_model_{max_num_nodes}.pth")
@@ -151,18 +151,19 @@ def train_rnn_rnn(
             output_graph = rnn_graph(x)
             y_pred = torch.zeros(x.size(0), max_num_nodes, max_num_nodes * 3)
             for i in range(max_num_nodes):
-                output_edge = rnn_edge(output_graph)
+                output_edge = rnn_edge(output_graph) # burde være output_graph[i] måske?????
                 output_edge[:, :, 0:1] = F.sigmoid(output_edge[:, :, 0:1])
-                output_edge = output_edge.flatten(start_dim=1, end_dim=2)
-                y_pred[:, i : i + 1, :] = output_edge
-            
-            loss = F.binary_cross_entropy(y_pred, y)
+                output_edge = output_edge.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
+                y_pred[:, i, :] = output_edge
+            loss_k2 = F.binary_cross_entropy(y_pred[:,:,:max_num_nodes], y[:,:,:max_num_nodes])
+            loss_l2 = F.mse_loss(y_pred[:,:,max_num_nodes:], y[:,:,max_num_nodes:])
+            loss = loss_k2 + loss_l2
             loss_sum += loss.item()
             loss.backward()
             optimizer_rnn_graph.step()
             optimizer_rnn_edge.step()
-            if epoch % 5 == 0:
-                print(loss.item())
+        if epoch % 5 == 0:
+            print(f"epoch: {epoch}, loss: {loss.item()}")
     return rnn_graph, rnn_edge, loss_sum
 
 
@@ -226,5 +227,5 @@ if __name__ == "__main__":
 
     train(model, model_sel, device, learning_rate, epochs, max_num_nodes, training_data)
 
-    test_rnn_mlp(device, training_data, max_num_nodes, rnn, mlp)
+    # test_rnn_mlp(device, training_data, max_num_nodes, rnn, mlp)
     # test_inference_rnn_mlp(device, rnn, mlp, max_num_nodes, batch_size=batch_size)
