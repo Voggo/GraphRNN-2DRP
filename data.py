@@ -154,8 +154,7 @@ class Dataset(torch.utils.data.Dataset):
         # y[4, :, :] = np.tril(self.data_nodes_height[index])
         y = torch.tensor(y)
         x = torch.tensor(x)
-        x = torch.flatten(x, start_dim=0, end_dim=1).T
-        y = torch.flatten(y, start_dim=0, end_dim=1).T
+
         nodes = torch.tensor(nodes)
         return {"x": x, "y": y}
 

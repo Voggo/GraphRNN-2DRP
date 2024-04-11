@@ -26,10 +26,10 @@ class RNN(torch.nn.Module):
         )
         if has_output:
             self.output = torch.nn.Sequential(
-                    torch.nn.Linear(hidden_size, output_hidden_size),
-                    torch.nn.ReLU(),
-                    torch.nn.Linear(output_hidden_size, output_size)
-                )
+                torch.nn.Linear(hidden_size, output_hidden_size),
+                torch.nn.ReLU(),
+                torch.nn.Linear(output_hidden_size, output_size),
+            )
         self.hidden = None
 
     def init_hidden(self, batch_size):
@@ -139,31 +139,42 @@ def train_rnn_rnn(
     loss = 0
     rnn_graph.train()
     rnn_edge.train()
-    loss_sum = 0
     for epoch in range(epochs):
+        loss_sum = 0
         for batch in training_data:
             rnn_graph.zero_grad()
             rnn_edge.zero_grad()
-            x = batch["x"].float().to(device)
-            y = batch["y"].float().to(device)
+            x_bumpy = batch["x"].float().to(device)
+            y_bumpy = batch["y"].float().to(device)
+            x = torch.flatten(x_bumpy, start_dim=1, end_dim=2).transpose(-2, -1)
+            y = torch.flatten(y_bumpy, start_dim=1, end_dim=2).transpose(-2, -1)
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0))
-            rnn_edge.hidden = rnn_edge.init_hidden(x.size(0))
             output_graph = rnn_graph(x)
             y_pred = torch.zeros(x.size(0), max_num_nodes, max_num_nodes * 3)
             for i in range(max_num_nodes):
-                output_edge = rnn_edge(output_graph) # burde være output_graph[i] måske?????
+                rnn_edge.hidden = rnn_edge.init_hidden(x.size(0))
+                rnn_edge.hidden[0, :, :] = output_graph[:, -1, :]
+                # burde være udgangspunktet for hidden layer også er inputtet her de tre edge features
+                # og de to node features af den næste node. det skal igennem en linear layer og relu før det
+                # bliver inputtet til næste hidden layer.
+                edge_input = x_bumpy[:, :, 1:, i]
+                output_edge = rnn_edge(edge_input.transpose(-2, -1))
                 output_edge[:, :, 0:1] = F.sigmoid(output_edge[:, :, 0:1])
-                output_edge = output_edge.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
+                output_edge = output_edge.transpose(-2, -1).flatten(
+                    start_dim=1, end_dim=2
+                )
                 y_pred[:, i, :] = output_edge
-            loss_k2 = F.binary_cross_entropy(y_pred[:,:,:max_num_nodes], y[:,:,:max_num_nodes])
-            loss_l2 = F.mse_loss(y_pred[:,:,max_num_nodes:], y[:,:,max_num_nodes:])
+            loss_k2 = F.binary_cross_entropy(
+                y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
+            )
+            loss_l2 = F.mse_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
             loss = loss_k2 + loss_l2
             loss_sum += loss.item()
             loss.backward()
             optimizer_rnn_graph.step()
             optimizer_rnn_edge.step()
         if epoch % 5 == 0:
-            print(f"epoch: {epoch}, loss: {loss.item()}")
+            print(f"epoch: {epoch}, loss: {loss_sum/5}")
     return rnn_graph, rnn_edge, loss_sum
 
 
@@ -205,7 +216,7 @@ if __name__ == "__main__":
     batch_size = 12
     feature_size = 5
     hidden_size_1 = 64
-    hidden_size_2 = 32
+    hidden_size_2 = 64
 
     data = Dataset(120, 100, 100)
     # print(type(data[0][0]))
@@ -222,7 +233,7 @@ if __name__ == "__main__":
         model = {"nn1": rnn, "nn2": mlp}
     elif model_sel == "rnn_rnn":
         rnn_graph = RNN((max_num_nodes * 5) + 5, hidden_size_1, 3).to(device)
-        rnn_edge = RNN(hidden_size_1, hidden_size_2, 3, has_output=True, output_size=3).to(device)
+        rnn_edge = RNN(5, hidden_size_2, 3, has_output=True, output_size=3).to(device)
         model = {"nn1": rnn_graph, "nn2": rnn_edge}
 
     train(model, model_sel, device, learning_rate, epochs, max_num_nodes, training_data)
