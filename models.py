@@ -136,7 +136,6 @@ def train_rnn_rnn(
         list(rnn_graph.parameters()), lr=learning_rate
     )
     optimizer_rnn_edge = torch.optim.Adam(list(rnn_edge.parameters()), lr=learning_rate)
-    loss = 0
     rnn_graph.train()
     rnn_edge.train()
     for epoch in range(epochs):
@@ -146,8 +145,8 @@ def train_rnn_rnn(
             rnn_edge.zero_grad()
             x_bumpy = batch["x"].float().to(device)
             y_bumpy = batch["y"].float().to(device)
-            x = torch.flatten(x_bumpy, start_dim=1, end_dim=2).transpose(-2, -1)
-            y = torch.flatten(y_bumpy, start_dim=1, end_dim=2).transpose(-2, -1)
+            x = torch.cat((x_bumpy[:, 0, :, :], x_bumpy[:, 1, :, :], x_bumpy[:, 2, :, :], x_bumpy[:, 3, :, :], x_bumpy[:, 4, :, :]), dim=2)
+            y = torch.cat((y_bumpy[:, 0, :, :], y_bumpy[:, 1, :, :], y_bumpy[:, 2, :, :]), dim=2)
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0))
             output_graph = rnn_graph(x)
             y_pred = torch.zeros(x.size(0), max_num_nodes, max_num_nodes * 3)
@@ -158,11 +157,10 @@ def train_rnn_rnn(
                 output_edge = rnn_edge(
                     edge_input.transpose(-2, -1)
                 )  # (batch_size, seq_len(node_len), features)
+                output_edge = output_edge[:, :-1, :]
                 output_edge[:, :, 0:1] = F.sigmoid(output_edge[:, :, 0:1])
-                output_edge = output_edge.transpose(-2, -1).flatten(
-                    start_dim=1, end_dim=2
-                )
-                y_pred[:, i, :] = output_edge[:, :-3]
+                output_edge = torch.cat((output_edge[:, :, 0:1].mT, output_edge[:, :, 1:2].mT, output_edge[:, :, 2:].mT), dim=2)
+                y_pred[:, i, :] = output_edge[:, 0, :]
             loss_k2 = F.binary_cross_entropy(
                 y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
             )
@@ -197,12 +195,14 @@ def test_rnn_rnn(device, training_data, max_num_nodes, rnn_graph, rnn_edge):
             y_pred = torch.zeros(x.size(0), max_num_nodes, max_num_nodes * 3)
             for i in range(max_num_nodes):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0))
-                rnn_edge.hidden[0, :, :] = output_graph[:, -1, :]
+                rnn_edge.hidden[0, :, :] = output_graph[:, i, :]
                 edge_input = x_bumpy[:, :, 1:, i]
                 output_edge = rnn_edge(
                     edge_input.transpose(-2, -1)
                 )  # (batch_size, seq_len(node_len), features)
-                output_edge[:, :, 0:1] = torch.bernoulli(F.sigmoid(output_edge[:, :, 0:1]))
+                output_edge[:, :, 0:1] = torch.bernoulli(
+                    F.sigmoid(output_edge[:, :, 0:1])
+                )
                 output_edge = output_edge.transpose(-2, -1).flatten(
                     start_dim=1, end_dim=2
                 )
@@ -220,11 +220,9 @@ def test_inference_rnn_rnn(
     device, hidden_size_1, hidden_size_2, max_num_nodes, batch_size=1
 ):
     rnn_graph = RNN((max_num_nodes * 5), hidden_size_1, 3).to(device)
-    rnn_edge = RNN(5, hidden_size_2, 3, has_output=True, output_size=3).to(device)
+    rnn_edge = RNN(7, hidden_size_2, 3, has_output=True, output_size=3).to(device)
     rnn_graph.load_state_dict(torch.load(f"models/rnn_graph_model_{max_num_nodes}.pth"))
     rnn_edge.load_state_dict(torch.load(f"models/rnn_edge_model_{max_num_nodes}.pth"))
-    rnn_graph = RNN((max_num_nodes * 5), hidden_size_1, 3).to(device)
-    rnn_edge = RNN(5, hidden_size_2, 3, has_output=True, output_size=3).to(device)
     with torch.no_grad():
         rnn_graph.eval()
         rnn_edge.eval()
@@ -238,9 +236,26 @@ def test_inference_rnn_rnn(
             output_graph = rnn_graph(x_step)
             rnn_edge.hidden = rnn_edge.init_hidden(batch_size)
             rnn_edge.hidden[0, :, :] = output_graph[:, -1, :]
-            edge_input = torch.zeros(batch_size, 5)
-            edge_input[0, 3] = nodes[i][0]
-            edge_input[0, 4] = nodes[i][1]
+            edge_input = torch.zeros(batch_size, 7)
+            if i < len(nodes):
+                edge_input[0, 5] = nodes[i][0]
+                edge_input[0, 6] = nodes[i][1]
+            edge_y_pred = torch.zeros(batch_size, max_num_nodes, 5)
+            for j in range(i + 1):
+                if j < len(nodes):
+                    edge_input[0, 3] = nodes[j][0]
+                    edge_input[0, 4] = nodes[j][1]
+                output_edge = rnn_edge(edge_input.unsqueeze(0))
+                output_edge[:, 0, 0:1] = torch.bernoulli(
+                    F.sigmoid(output_edge[:, 0, 0:1])
+                )
+                output_edge[:, 0, 1:2] = torch.round(output_edge[:, 0, 1:2])
+                edge_y_pred[:, j, :3] = output_edge
+                edge_y_pred[:, j, 3:] = edge_input[0, 3:5]
+            edge_y_pred = edge_y_pred.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
+            y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 3]
+            x_step = edge_y_pred.unsqueeze(0)
+        print(y_pred)
 
 
 def train(
@@ -259,9 +274,11 @@ def train(
     elif model_sel == "rnn_rnn":
         rnn_graph = model["nn1"]
         rnn_edge = model["nn2"]
-        if not os.path.isfile(
-            f"models/rnn_graph_model_{max_num_nodes}.pth"
-        ) or not os.path.isfile(f"models/rnn_edge_model_{max_num_nodes}.pth"):
+        if (
+            not os.path.isfile(f"models/rnn_graph_model_{max_num_nodes}.pth")
+            or not os.path.isfile(f"models/rnn_edge_model_{max_num_nodes}.pth")
+            or True
+        ):
             rnn_graph, rnn_edge, loss_sum = train_rnn_rnn(
                 rnn_graph,
                 rnn_edge,
@@ -280,7 +297,7 @@ if __name__ == "__main__":
 
     model_sel = "rnn_rnn"
     learning_rate = 0.001
-    epochs = 100
+    epochs = 150
     batch_size = 12
     feature_size = 5
     hidden_size_1 = 64
@@ -300,13 +317,13 @@ if __name__ == "__main__":
         mlp = MLP(32, 16, max_num_nodes).to(device)
         model = {"nn1": rnn, "nn2": mlp}
     elif model_sel == "rnn_rnn":
-        rnn_graph = RNN((max_num_nodes * 7) + 7, hidden_size_1, 3).to(device)
+        rnn_graph = RNN((max_num_nodes * 5), hidden_size_1, 3).to(device)
         rnn_edge = RNN(7, hidden_size_2, 3, has_output=True, output_size=3).to(device)
         model = {"nn1": rnn_graph, "nn2": rnn_edge}
 
     train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
 
-    # test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 16)
+    # test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 17)
     # test_rnn_rnn(device, data, max_num_nodes, model['nn1'], model['nn2'])
 
     # test_rnn_mlp(device, data, max_num_nodes, rnn, mlp)
