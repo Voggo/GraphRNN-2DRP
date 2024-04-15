@@ -93,11 +93,11 @@ class Dataset(torch.utils.data.Dataset):
             # Calculate padding size
             pad_size = self.max_num_nodes - bfs_adj.shape[0]
             self.data_nodes_width[i] = np.tile(
-                self.data_bfs_nodes[i][:, 0], (self.max_num_nodes + 1, 1)
-            )
+                self.data_bfs_nodes[i][:, 0], (len(self.data_bfs_nodes[i]), 1)
+            ).T
             self.data_nodes_height[i] = np.tile(
-                self.data_bfs_nodes[i][:, 1], (self.max_num_nodes + 1, 1)
-            )
+                self.data_bfs_nodes[i][:, 1], (len(self.data_bfs_nodes[i]), 1)
+            ).T
             # Pad the array
             if pad_size > 0:
                 self.data_bfs_adj[i] = np.pad(
@@ -117,12 +117,12 @@ class Dataset(torch.utils.data.Dataset):
                 )
                 self.data_nodes_width[i] = np.pad(
                     self.data_nodes_width[i],
-                    ((0, 0), (0, pad_size)),
+                    ((0, pad_size), (0, pad_size)),
                     mode="constant",
                 )
                 self.data_nodes_height[i] = np.pad(
                     self.data_nodes_height[i],
-                    ((0, 0), (0, pad_size)),
+                    ((0, pad_size), (0, pad_size)),
                     mode="constant",
                 )
 
@@ -139,7 +139,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         nodes = np.array(self.data_nodes[index])
-        x = np.zeros((5, self.max_num_nodes + 1, self.max_num_nodes))
+        x = np.zeros((7, self.max_num_nodes + 1, self.max_num_nodes))
         y = np.zeros((3, self.max_num_nodes, self.max_num_nodes))
         x[:3, 0:1, :] = np.ones((3, 1, self.max_num_nodes))
         x[0, 1:, :] = np.tril(self.data_bfs_adj[index])
@@ -148,9 +148,13 @@ class Dataset(torch.utils.data.Dataset):
         y[1, :, :] = np.tril(self.data_bfs_edge_dir[index])
         x[2, 1:, :] = np.tril(self.data_bfs_edge_angle[index])
         y[2, :, :] = np.tril(self.data_bfs_edge_angle[index])
-        x[3, :, :] = np.tril(self.data_nodes_width[index])
+        x[3, :-1, :] = np.tril(self.data_nodes_width[index])
+        # x[3, 0, 1:] += 1 # add one to the first row but the first node in the graph
         # y[3, :, :] = np.tril(self.data_nodes_width[index])
-        x[4, :, :] = np.tril(self.data_nodes_height[index])
+        x[4, :-1, :] = np.tril(self.data_nodes_height[index])
+        x[5, :-1, :] = np.tril(self.data_nodes_width[index].T)
+        x[6, :-1, :] = np.tril(self.data_nodes_height[index].T)
+        # x[4, 0, 1:] += 1 # add one to the first row but the first node in the graph
         # y[4, :, :] = np.tril(self.data_nodes_height[index])
         y = torch.tensor(y)
         x = torch.tensor(x)
@@ -164,13 +168,13 @@ if __name__ == "__main__":
     for i in range(10):
         d = data[i]
         x = d["x"]
-        print(x.shape)
+        print(x)
         # print(x)
         print(d["y"].shape)
-    training_data = torch.utils.data.DataLoader(
-        data, batch_size=2, shuffle=False
-    )
-    for batch in training_data:
-        print(batch["x"].shape)
-        print(batch["y"].shape)
+    # training_data = torch.utils.data.DataLoader(
+    #     data, batch_size=2, shuffle=False
+    # )
+    # for batch in training_data:
+    #     print(batch["x"].shape)
+    #     print(batch["y"].shape)
 
