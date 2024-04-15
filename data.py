@@ -122,7 +122,7 @@ class Dataset(torch.utils.data.Dataset):
                 )
                 self.data_nodes_height[i] = np.pad(
                     self.data_nodes_height[i],
-                    ((0, pad_size), (0, pad_size)),
+                    ((0, pad_size), (0, 0)),
                     mode="constant",
                 )
 
