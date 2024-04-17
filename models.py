@@ -186,6 +186,7 @@ def train_rnn_rnn(
             loss_k2 = F.binary_cross_entropy(
                 y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
             )
+            y_pred[:, :, max_num_nodes*2:] *= y_pred[:, :, :max_num_nodes]
             loss_l2 = F.mse_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
             loss = loss_k2 + loss_l2
             loss_sum += loss.item()
@@ -286,14 +287,18 @@ def test_inference_rnn_rnn(
             y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 3]
             x_step = edge_y_pred.unsqueeze(0)
         print(y_pred)
-        adj = y_pred[0, :, :max_num_nodes].reshape(max_num_nodes, max_num_nodes)
+        adj = y_pred[0, :, :max_num_nodes].reshape(max_num_nodes, max_num_nodes).to(torch.int64)
         adj.diagonal().fill_(0)
-        adj += adj.T
+        adj = adj + adj.T
         edge_dir = y_pred[0, :, max_num_nodes:max_num_nodes * 2].reshape(
             max_num_nodes, max_num_nodes
-        )
-        
+        ).to(torch.int64)
+        edge_dir.diagonal().fill_(0)
+        mapping = torch.tensor([0, 3, 4, 1, 2])
+        edge_dir = edge_dir + mapping[edge_dir].T
         edge_angle = y_pred[0, :, max_num_nodes * 2:].reshape(max_num_nodes, max_num_nodes)
+        edge_angle.diagonal().fill_(0)
+        edge_angle = edge_angle + edge_angle.T
         nodes = [Rectangle(node[0], node[1], 0) for node in nodes]
         rects = convert_graph_to_rects(nodes, adj, edge_dir, edge_angle)
         plot_rects(rects, ax_lim=100, ay_lim=100, ax_min=-50, ay_min=-50, filename="rnn_rnn.png")
@@ -343,6 +348,7 @@ if __name__ == "__main__":
     hidden_size_1 = 64
     hidden_size_2 = 64
 
+    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 13)
     dataset = Dataset(120, 100, 100)
     # print(type(data[0][0]))
 
@@ -361,9 +367,8 @@ if __name__ == "__main__":
         rnn_edge = RNN(7, hidden_size_2, 4, has_output=True, output_size=3).to(device)
         model = {"nn1": rnn_graph, "nn2": rnn_edge}
 
-    # train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
+    train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
 
-    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 13)
     # test_rnn_rnn(device, data, max_num_nodes, model['nn1'], model['nn2'])
 
     # test_rnn_mlp(device, data, max_num_nodes, rnn, mlp)
