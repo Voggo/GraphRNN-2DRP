@@ -35,7 +35,9 @@ class RNN(torch.nn.Module):
                 torch.nn.Linear(output_hidden_size, output_size),
             )
         self.hidden = None
-
+        
+    def init_hidden(self, batch_size):
+        return torch.zeros(self.num_layers, batch_size, self.rnn.hidden_size)
 
     def forward(self, x):
         output, self.hidden = self.rnn(x, self.hidden)
@@ -346,7 +348,7 @@ if __name__ == "__main__":
     hidden_size_1 = 64
     hidden_size_2 = 64
 
-    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 13)
+    # test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 13)
     dataset = Dataset(120, 100, 100)
     # print(type(data[0][0]))
 
