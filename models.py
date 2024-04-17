@@ -186,7 +186,7 @@ def train_rnn_rnn(
             loss_k2 = F.binary_cross_entropy(
                 y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
             )
-            y_pred[:, :, max_num_nodes*2:] *= y_pred[:, :, :max_num_nodes]
+            # y_pred[:, :, max_num_nodes*2:] *= y_pred[:, :, :max_num_nodes]
             loss_l2 = F.mse_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
             loss = loss_k2 + loss_l2
             loss_sum += loss.item()
@@ -195,7 +195,7 @@ def train_rnn_rnn(
             optimizer_rnn_edge.step()
         if epoch % 5 == 0:
             print(f"epoch: {epoch}, loss: {loss_sum/5}")
-        if epoch % 100 == 0:
+        if epoch % 100 == 0 and not epoch == 0:
             torch.save(rnn_graph.state_dict(), f"models/rnn_graph_model_{max_num_nodes}.pth")
             torch.save(rnn_edge.state_dict(), f"models/rnn_edge_model_{max_num_nodes}.pth")
 
