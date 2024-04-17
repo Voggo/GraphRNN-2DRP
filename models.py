@@ -3,6 +3,10 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 import os
 from data import DatasetSimple, Dataset
+from plot_rects import plot_rects
+from generator import convert_graph_to_rects
+from dataclasses_rect_point import Rectangle, Point
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
 class RNN(torch.nn.Module):
@@ -190,6 +194,9 @@ def train_rnn_rnn(
             optimizer_rnn_edge.step()
         if epoch % 5 == 0:
             print(f"epoch: {epoch}, loss: {loss_sum/5}")
+        if epoch % 100 == 0:
+            torch.save(rnn_graph.state_dict(), f"models/rnn_graph_model_{max_num_nodes}.pth")
+            torch.save(rnn_edge.state_dict(), f"models/rnn_edge_model_{max_num_nodes}.pth")
 
     torch.save(rnn_graph.state_dict(), f"models/rnn_graph_model_{max_num_nodes}.pth")
     torch.save(rnn_edge.state_dict(), f"models/rnn_edge_model_{max_num_nodes}.pth")
@@ -247,8 +254,6 @@ def test_inference_rnn_rnn(
         data = Dataset(1, 100, 100)
         nodes = data.data_bfs_nodes[0]
         x_step = torch.ones(batch_size, 1, max_num_nodes * 5)
-        # x_step[0, :, max_num_nodes * 3] = nodes[0][0]
-        # x_step[0, :, max_num_nodes * 4] = nodes[0][1]
         y_pred = torch.zeros(batch_size, max_num_nodes, max_num_nodes * 3)
         for i in range(max_num_nodes):
             output_graph = rnn_graph(x_step)
@@ -281,7 +286,17 @@ def test_inference_rnn_rnn(
             y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 3]
             x_step = edge_y_pred.unsqueeze(0)
         print(y_pred)
-
+        adj = y_pred[0, :, :max_num_nodes].reshape(max_num_nodes, max_num_nodes)
+        adj.diagonal().fill_(0)
+        adj += adj.T
+        edge_dir = y_pred[0, :, max_num_nodes:max_num_nodes * 2].reshape(
+            max_num_nodes, max_num_nodes
+        )
+        
+        edge_angle = y_pred[0, :, max_num_nodes * 2:].reshape(max_num_nodes, max_num_nodes)
+        nodes = [Rectangle(node[0], node[1], 0) for node in nodes]
+        rects = convert_graph_to_rects(nodes, adj, edge_dir, edge_angle)
+        plot_rects(rects, ax_lim=100, ay_lim=100, ax_min=-50, ay_min=-50, filename="rnn_rnn.png")
 
 def train(
     model, model_sel, device, learning_rate, epochs, max_num_nodes, training_data
@@ -348,7 +363,7 @@ if __name__ == "__main__":
 
     # train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
 
-    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 14)
+    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 13)
     # test_rnn_rnn(device, data, max_num_nodes, model['nn1'], model['nn2'])
 
     # test_rnn_mlp(device, data, max_num_nodes, rnn, mlp)

@@ -93,10 +93,10 @@ class Dataset(torch.utils.data.Dataset):
             # Calculate padding size
             pad_size = self.max_num_nodes - bfs_adj.shape[0]
             self.data_nodes_width[i] = np.tile(
-                self.data_bfs_nodes[i][:, 0], (self.max_num_nodes, 1)
+                self.data_bfs_nodes[i][:, 0], (len(self.data_bfs_nodes[i]), 1)
             ).T
             self.data_nodes_height[i] = np.tile(
-                self.data_bfs_nodes[i][:, 1], (self.max_num_nodes, 1)
+                self.data_bfs_nodes[i][:, 1], (len(self.data_bfs_nodes[i]), 1)
             ).T
             # Pad the array
             if pad_size > 0:
@@ -117,12 +117,12 @@ class Dataset(torch.utils.data.Dataset):
                 )
                 self.data_nodes_width[i] = np.pad(
                     self.data_nodes_width[i],
-                    ((0, pad_size), (0, 0)),
+                    ((0, pad_size), (0, pad_size)),
                     mode="constant",
                 )
                 self.data_nodes_height[i] = np.pad(
                     self.data_nodes_height[i],
-                    ((0, pad_size), (0, 0)),
+                    ((0, pad_size), (0, pad_size)),
                     mode="constant",
                 )
 
