@@ -136,23 +136,33 @@ def test_inference_rnn_mlp(device, rnn, mlp, max_num_nodes, batch_size=1):
 
 
 def train_rnn_rnn(
-    rnn_graph, rnn_edge, device, learning_rate, epochs, max_num_nodes, training_data
+    rnn_graph,
+    rnn_edge,
+    device,
+    learning_rate,
+    epochs,
+    max_num_nodes,
+    training_data,
+    lambda_kl_adj=0.20,
+    lambda_kl_dir=0.6,
+    lambda_l2=0.20,
 ):
     optimizer_rnn_graph = torch.optim.Adam(
         list(rnn_graph.parameters()), lr=learning_rate
     )
     optimizer_rnn_edge = torch.optim.Adam(list(rnn_edge.parameters()), lr=learning_rate)
     scheduler_rnn_graph = torch.optim.lr_scheduler.StepLR(
-        optimizer_rnn_graph, step_size=800, gamma=0.1
+        optimizer_rnn_graph, step_size=1000, gamma=0.1
     )
     scheduler_rnn_edge = torch.optim.lr_scheduler.StepLR(
-        optimizer_rnn_edge, step_size=700, gamma=0.1
+        optimizer_rnn_edge, step_size=1000, gamma=0.1
     )
     rnn_graph.train()
     rnn_edge.train()
     for epoch in range(epochs):
         loss_sum = 0
-        loss_bce_sum = 0
+        loss_bce_adj_sum = 0
+        loss_bce_dir_sum = 0
         loss_mse_sum = 0
         for batch in training_data:
             rnn_graph.zero_grad()
@@ -212,15 +222,20 @@ def train_rnn_rnn(
                 y_pred[:, i, :] = output_edge[:, 0, :]
             y_pred_adj = y_pred[:, :, :max_num_nodes].clone()
             y_pred[:, :, max_num_nodes * 6 :] *= y_pred_adj
-            loss_k2 = F.binary_cross_entropy(
-                y_pred[:, :, : max_num_nodes * 6], y[:, :, : max_num_nodes * 6]
+            loss_kl_adj = F.binary_cross_entropy(
+                y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
+            )
+            loss_kl_dir = F.binary_cross_entropy(
+                y_pred[:, :, max_num_nodes : max_num_nodes * 6],
+                y[:, :, max_num_nodes : max_num_nodes * 6],
             )
             loss_l2 = F.mse_loss(
                 y_pred[:, :, max_num_nodes * 6 :], y[:, :, max_num_nodes * 6 :]
             )
-            loss = loss_k2 + loss_l2
+            loss = lambda_kl_adj * loss_kl_adj + lambda_kl_dir * loss_kl_dir + lambda_l2 * loss_l2
             loss_sum += loss.item()
-            loss_bce_sum += loss_k2.item()
+            loss_bce_adj_sum += loss_kl_adj.item()
+            loss_bce_dir_sum += loss_kl_dir.item()
             loss_mse_sum += loss_l2.item()
             loss.backward()
             optimizer_rnn_graph.step()
@@ -229,7 +244,7 @@ def train_rnn_rnn(
         scheduler_rnn_edge.step()
         if epoch % 5 == 0:
             print(
-                f"epoch: {epoch}, loss: {loss_sum/5}, bce: {loss_bce_sum/5}, mse: {loss_mse_sum/5}"
+                f"epoch: {epoch}, loss: {loss_sum/5}, bce adj: {loss_bce_adj_sum/5}, bce dir: {loss_bce_dir_sum/5}, mse: {loss_mse_sum/5}"
             )
         if epoch % 100 == 0 and not epoch == 0:
             torch.save(
@@ -295,7 +310,7 @@ def test_inference_rnn_rnn(
         data = Dataset(6)
         print(data.data_bfs_adj[0])
         print(data.data_bfs_edge_dir[0])
-        nodes = data.data_bfs_nodes[5]
+        nodes = data.data_bfs_nodes[1]
         x_step = torch.ones(batch_size, 1, max_num_nodes * 9)
         y_pred = torch.zeros(batch_size, max_num_nodes, max_num_nodes * 7)
         for i in range(max_num_nodes):
@@ -331,7 +346,7 @@ def test_inference_rnn_rnn(
             edge_y_pred = edge_y_pred.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
             y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 7]
             x_step = edge_y_pred.unsqueeze(0)
-        
+
         adj = (
             y_pred[0, :, :max_num_nodes]
             .reshape(max_num_nodes, max_num_nodes)
@@ -343,7 +358,7 @@ def test_inference_rnn_rnn(
         edge_dir_splits = torch.split(edge_dir, edge_dir.size(1) // 5, dim=1)
         edge_dir = torch.stack(edge_dir_splits, dim=2)
         edge_dir = torch.argmax(edge_dir, dim=2)
-        
+
         edge_dir.diagonal().fill_(0)
         mapping = torch.tensor([0, 3, 4, 1, 2])
         edge_dir = edge_dir + mapping[edge_dir].T
@@ -404,14 +419,14 @@ if __name__ == "__main__":
 
     model_sel = "rnn_rnn"
     learning_rate = 0.001
-    epochs = 2000
+    epochs = 2500
     batch_size = 12
     feature_size = 5
     hidden_size_1 = 64
     hidden_size_2 = 64
 
-    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 6)
-    dataset = Dataset(6)
+    test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 4)
+    dataset = Dataset(4)
 
     max_num_nodes = dataset.max_num_nodes
 
