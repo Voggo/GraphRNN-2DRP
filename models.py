@@ -142,8 +142,12 @@ def train_rnn_rnn(
         list(rnn_graph.parameters()), lr=learning_rate
     )
     optimizer_rnn_edge = torch.optim.Adam(list(rnn_edge.parameters()), lr=learning_rate)
-    scheduler_rnn_graph = torch.optim.lr_scheduler.StepLR(optimizer_rnn_graph, step_size=700, gamma=0.1)
-    scheduler_rnn_edge = torch.optim.lr_scheduler.StepLR(optimizer_rnn_edge, step_size=700, gamma=0.1)
+    scheduler_rnn_graph = torch.optim.lr_scheduler.StepLR(
+        optimizer_rnn_graph, step_size=800, gamma=0.1
+    )
+    scheduler_rnn_edge = torch.optim.lr_scheduler.StepLR(
+        optimizer_rnn_edge, step_size=700, gamma=0.1
+    )
     rnn_graph.train()
     rnn_edge.train()
     for epoch in range(epochs):
@@ -162,15 +166,28 @@ def train_rnn_rnn(
                     x_bumpy[:, 2, :, :],
                     x_bumpy[:, 3, :, :],
                     x_bumpy[:, 4, :, :],
+                    x_bumpy[:, 5, :, :],
+                    x_bumpy[:, 6, :, :],
+                    x_bumpy[:, 7, :, :],
+                    x_bumpy[:, 8, :, :],
                 ),
                 dim=2,
             )
             y = torch.cat(
-                (y_bumpy[:, 0, :, :], y_bumpy[:, 1, :, :], y_bumpy[:, 2, :, :]), dim=2
+                (
+                    y_bumpy[:, 0, :, :],
+                    y_bumpy[:, 1, :, :],
+                    y_bumpy[:, 2, :, :],
+                    y_bumpy[:, 3, :, :],
+                    y_bumpy[:, 4, :, :],
+                    y_bumpy[:, 5, :, :],
+                    y_bumpy[:, 6, :, :],
+                ),
+                dim=2,
             )
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0))
             output_graph = rnn_graph(x)
-            y_pred = torch.zeros(x.size(0), max_num_nodes, max_num_nodes * 3)
+            y_pred = torch.zeros(x.size(0), max_num_nodes, max_num_nodes * 7)
             for i in range(max_num_nodes):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0))
                 rnn_edge.hidden[0, :, :] = output_graph[:, i, :]
@@ -179,22 +196,28 @@ def train_rnn_rnn(
                 )  # (batch_size, seq_len(node_len), features)
                 output_edge = rnn_edge(edge_input)
                 output_edge = output_edge[:, :-1, :]
-                output_edge[:, :, 0:1] = F.sigmoid(output_edge[:, :, 0:1])
+                output_edge[:, :, 0:6] = F.sigmoid(output_edge[:, :, 0:6])
                 output_edge = torch.cat(
                     (
                         output_edge[:, :, 0:1].mT,
                         output_edge[:, :, 1:2].mT,
-                        output_edge[:, :, 2:].mT,
+                        output_edge[:, :, 2:3].mT,
+                        output_edge[:, :, 3:4].mT,
+                        output_edge[:, :, 4:5].mT,
+                        output_edge[:, :, 5:6].mT,
+                        output_edge[:, :, 6:].mT,
                     ),
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
             y_pred_adj = y_pred[:, :, :max_num_nodes].clone()
-            y_pred[:, :, max_num_nodes * 2:] *= y_pred_adj
+            y_pred[:, :, max_num_nodes * 6 :] *= y_pred_adj
             loss_k2 = F.binary_cross_entropy(
-                y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
+                y_pred[:, :, : max_num_nodes * 6], y[:, :, : max_num_nodes * 6]
             )
-            loss_l2 = F.mse_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
+            loss_l2 = F.mse_loss(
+                y_pred[:, :, max_num_nodes * 6 :], y[:, :, max_num_nodes * 6 :]
+            )
             loss = loss_k2 + loss_l2
             loss_sum += loss.item()
             loss_bce_sum += loss_k2.item()
@@ -205,7 +228,9 @@ def train_rnn_rnn(
         scheduler_rnn_graph.step()
         scheduler_rnn_edge.step()
         if epoch % 5 == 0:
-            print(f"epoch: {epoch}, loss: {loss_sum/5}, bce: {loss_bce_sum/5}, mse: {loss_mse_sum/5}")
+            print(
+                f"epoch: {epoch}, loss: {loss_sum/5}, bce: {loss_bce_sum/5}, mse: {loss_mse_sum/5}"
+            )
         if epoch % 100 == 0 and not epoch == 0:
             torch.save(
                 rnn_graph.state_dict(), f"models/rnn_graph_model_{max_num_nodes}.pth"
@@ -260,8 +285,8 @@ def test_rnn_rnn(device, training_data, max_num_nodes, rnn_graph, rnn_edge):
 def test_inference_rnn_rnn(
     device, hidden_size_1, hidden_size_2, max_num_nodes, batch_size=1
 ):
-    rnn_graph = RNN((max_num_nodes * 5), hidden_size_1, 4).to(device)
-    rnn_edge = RNN(7, hidden_size_2, 4, has_output=True, output_size=3).to(device)
+    rnn_graph = RNN((max_num_nodes * 9), hidden_size_1, 4).to(device)
+    rnn_edge = RNN(11, hidden_size_2, 4, has_output=True, output_size=7).to(device)
     rnn_graph.load_state_dict(torch.load(f"models/rnn_graph_model_{max_num_nodes}.pth"))
     rnn_edge.load_state_dict(torch.load(f"models/rnn_edge_model_{max_num_nodes}.pth"))
     with torch.no_grad():
@@ -270,39 +295,43 @@ def test_inference_rnn_rnn(
         data = Dataset(6)
         print(data.data_bfs_adj[0])
         print(data.data_bfs_edge_dir[0])
-        nodes = data.data_bfs_nodes[0]
-        x_step = torch.ones(batch_size, 1, max_num_nodes * 5)
-        y_pred = torch.zeros(batch_size, max_num_nodes, max_num_nodes * 3)
+        nodes = data.data_bfs_nodes[5]
+        x_step = torch.ones(batch_size, 1, max_num_nodes * 9)
+        y_pred = torch.zeros(batch_size, max_num_nodes, max_num_nodes * 7)
         for i in range(max_num_nodes):
             output_graph = rnn_graph(x_step)
             rnn_edge.hidden = rnn_edge.init_hidden(batch_size)
             rnn_edge.hidden[0, :, :] = output_graph[:, -1, :]
-            edge_input_step = torch.ones(batch_size, 7)
-            edge_y_pred = torch.zeros(batch_size, max_num_nodes, 5)
+            edge_input_step = torch.ones(batch_size, 11)
+            edge_y_pred = torch.zeros(batch_size, max_num_nodes, 9)
             for j in range(i + 1):
                 output_edge = rnn_edge(edge_input_step.unsqueeze(0))
                 output_edge[:, 0, 0:1] = torch.bernoulli(
                     F.sigmoid(output_edge[:, 0, 0:1])
                 )
-                output_edge[:, 0, 1:2] = torch.round(output_edge[:, 0, 1:2])
-                edge_input_step[:, :3] = output_edge[0, 0, :]
+                dir = torch.argmax(output_edge[:, 0, 1:6], dim=1)
+                output_edge[:, 0, 1 + dir] = 1
+                output_edge[:, 0, 1 : dir + 1] = 0
+                output_edge[:, 0, dir + 2 : 6] = 0
+                edge_input_step[:, :7] = output_edge[0, 0, :]
                 if j < len(nodes):
-                    edge_input_step[0, 3] = nodes[j][0]
-                    edge_input_step[0, 4] = nodes[j][1]
+                    edge_input_step[0, 7] = nodes[j][0]
+                    edge_input_step[0, 8] = nodes[j][1]
                 else:
-                    edge_input_step[0, 3] = 0
-                    edge_input_step[0, 4] = 0
+                    edge_input_step[0, 7] = 0
+                    edge_input_step[0, 8] = 0
                 if i < len(nodes):
-                    edge_input_step[0, 5] = nodes[i][0]
-                    edge_input_step[0, 6] = nodes[i][1]
+                    edge_input_step[0, 9] = nodes[i][0]
+                    edge_input_step[0, 10] = nodes[i][1]
                 else:
-                    edge_input_step[0, 5] = 0
-                    edge_input_step[0, 6] = 0
-                edge_y_pred[:, j, :3] = output_edge
-                edge_y_pred[:, j, 3:] = edge_input_step[0, 3:5]
+                    edge_input_step[0, 9] = 0
+                    edge_input_step[0, 10] = 0
+                edge_y_pred[:, j, :7] = output_edge[:, :, :7]
+                edge_y_pred[:, j, 7:] = edge_input_step[:, 7:9]
             edge_y_pred = edge_y_pred.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
-            y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 3]
+            y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 7]
             x_step = edge_y_pred.unsqueeze(0)
+        
         adj = (
             y_pred[0, :, :max_num_nodes]
             .reshape(max_num_nodes, max_num_nodes)
@@ -310,15 +339,15 @@ def test_inference_rnn_rnn(
         )
         adj.diagonal().fill_(0)
         adj = adj + adj.T
-        edge_dir = (
-            y_pred[0, :, max_num_nodes : max_num_nodes * 2]
-            .reshape(max_num_nodes, max_num_nodes)
-            .to(torch.int64)
-        )
+        edge_dir = y_pred[0, :, max_num_nodes : max_num_nodes * 6]
+        edge_dir_splits = torch.split(edge_dir, edge_dir.size(1) // 5, dim=1)
+        edge_dir = torch.stack(edge_dir_splits, dim=2)
+        edge_dir = torch.argmax(edge_dir, dim=2)
+        
         edge_dir.diagonal().fill_(0)
         mapping = torch.tensor([0, 3, 4, 1, 2])
         edge_dir = edge_dir + mapping[edge_dir].T
-        edge_angle = y_pred[0, :, max_num_nodes * 2 :].reshape(
+        edge_angle = y_pred[0, :, max_num_nodes * 6 :].reshape(
             max_num_nodes, max_num_nodes
         )
         edge_angle.diagonal().fill_(0)
@@ -395,8 +424,8 @@ if __name__ == "__main__":
         mlp = MLP(32, 16, max_num_nodes).to(device)
         model = {"nn1": rnn, "nn2": mlp}
     elif model_sel == "rnn_rnn":
-        rnn_graph = RNN((max_num_nodes * 5), hidden_size_1, 4).to(device)
-        rnn_edge = RNN(7, hidden_size_2, 4, has_output=True, output_size=3).to(device)
+        rnn_graph = RNN((max_num_nodes * 9), hidden_size_1, 4).to(device)
+        rnn_edge = RNN(11, hidden_size_2, 4, has_output=True, output_size=7).to(device)
         model = {"nn1": rnn_graph, "nn2": rnn_edge}
 
     train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)

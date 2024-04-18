@@ -5,7 +5,6 @@ import networkx as nx
 from generator import generate_rects_and_graph, convert_graph_to_rects
 
 
-
 class DatasetSimple(torch.utils.data.Dataset):
     def __init__(self, num_graphs, height, width):
         self.n_breaks = 5
@@ -100,7 +99,6 @@ def generate_datasets(num_graphs, height, width, n_breaks=5):
         data_bfs_edge_dir[nodes_len].append(edge_dir[np.ix_(bfs_index, bfs_index)])
         data_bfs_edge_angle[nodes_len].append(edge_angle[np.ix_(bfs_index, bfs_index)])
 
-
         if len(data_bfs_nodes[nodes_len]) == num_graphs:
             is_full[nodes_len] = True
             if all(is_full.values()):
@@ -128,14 +126,14 @@ class Dataset(torch.utils.data.Dataset):
         self.data_nodes_width = np.load(f"datasets/data_nodes_width_{node_len}.npy")
         self.data_nodes_height = np.load(f"datasets/data_nodes_height_{node_len}.npy")
         self.data_bfs_adj = np.load(f"datasets/data_bfs_adj_{node_len}.npy")
-        self.data_bfs_edge_dir = torch.LongTensor(np.load(f"datasets/data_bfs_edge_dir_{node_len}.npy"))
+        self.data_bfs_edge_dir = torch.LongTensor(
+            np.load(f"datasets/data_bfs_edge_dir_{node_len}.npy")
+        )
         self.data_bfs_edge_angle = np.load(
             f"datasets/data_bfs_edge_angle_{node_len}.npy"
         )
         self.max_num_nodes = node_len
         self.num_graphs = len(self.data_bfs_nodes)
-        
-        
 
     def bfs_index(self, adj, start):
         """return the index of the nodes in bfs order"""
@@ -149,24 +147,29 @@ class Dataset(torch.utils.data.Dataset):
         return self.num_graphs
 
     def __getitem__(self, index):
-        x = np.zeros((7, self.max_num_nodes + 1, self.max_num_nodes))
-        y = np.zeros((3, self.max_num_nodes, self.max_num_nodes))
+        x = np.zeros((11, self.max_num_nodes + 1, self.max_num_nodes))
+        y = np.zeros((7, self.max_num_nodes, self.max_num_nodes))
         edge_dir = np.array(F.one_hot(self.data_bfs_edge_dir[index], 5))
-        x[:, 0:1, :] = np.ones((7, 1, self.max_num_nodes))
+        x[:, 0:1, :] = np.ones((11, 1, self.max_num_nodes))
         x[0, 1:, :] = np.tril(self.data_bfs_adj[index])
         y[0, :, :] = np.tril(self.data_bfs_adj[index])
-        x[1, 1:, :] = np.tril(self.data_bfs_edge_dir[index])
-        y[1, :, :] = np.tril(self.data_bfs_edge_dir[index])
-        x[2, 1:, :] = np.tril(self.data_bfs_edge_angle[index])
-        y[2, :, :] = np.tril(self.data_bfs_edge_angle[index])
-        # x[3, 0, 1:] += 1 # add one to the first row but the first node in the graph
-        # y[3, :, :] = np.tril(self.data_nodes_width[index])
-        x[3, 1:, :] = np.tril(self.data_nodes_width[index].T)
-        x[4, 1:, :] = np.tril(self.data_nodes_height[index].T)
-        x[5, 1:, :] = np.tril(self.data_nodes_width[index])
-        x[6, 1:, :] = np.tril(self.data_nodes_height[index])
-        # x[4, 0, 1:] += 1 # add one to the first row but the first node in the graph
-        # y[4, :, :] = np.tril(self.data_nodes_height[index])
+        x[1, 1:, :] = np.tril(edge_dir[:, :, 0])
+        y[1, :, :] = np.tril(edge_dir[:, :, 0])
+        x[2, 1:, :] = np.tril(edge_dir[:, :, 1])
+        y[2, :, :] = np.tril(edge_dir[:, :, 1])
+        x[3, 1:, :] = np.tril(edge_dir[:, :, 2])
+        y[3, :, :] = np.tril(edge_dir[:, :, 2])
+        x[4, 1:, :] = np.tril(edge_dir[:, :, 3])
+        y[4, :, :] = np.tril(edge_dir[:, :, 3])
+        x[5, 1:, :] = np.tril(edge_dir[:, :, 4])
+        y[5, :, :] = np.tril(edge_dir[:, :, 4])
+
+        x[6, 1:, :] = np.tril(self.data_bfs_edge_angle[index])
+        y[6, :, :] = np.tril(self.data_bfs_edge_angle[index])
+        x[7, 1:, :] = np.tril(self.data_nodes_width[index].T)
+        x[8, 1:, :] = np.tril(self.data_nodes_height[index].T)
+        x[9, 1:, :] = np.tril(self.data_nodes_width[index])
+        x[10, 1:, :] = np.tril(self.data_nodes_height[index])
         y = torch.tensor(y)
         x = torch.tensor(x)
         return {"x": x, "y": y}
@@ -175,7 +178,8 @@ class Dataset(torch.utils.data.Dataset):
 if __name__ == "__main__":
     # generate_datasets(120, 100, 100)
     data = Dataset(6)
-    data[0]
+    x = data[0]['x']
+    print(x)
     # for i in range(10):
     #     d = data[i]
     #     x = d["x"]
