@@ -194,7 +194,6 @@ def train_rnn_rnn(
             loss_k2 = F.binary_cross_entropy(
                 y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
             )
-            # y_pred[:, :, max_num_nodes*2:] *= y_pred[:, :, :max_num_nodes]
             loss_l2 = F.mse_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
             loss = loss_k2 + loss_l2
             loss_sum += loss.item()
@@ -304,7 +303,6 @@ def test_inference_rnn_rnn(
             edge_y_pred = edge_y_pred.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
             y_pred[:, i, :] = edge_y_pred[:, : max_num_nodes * 3]
             x_step = edge_y_pred.unsqueeze(0)
-        # print(y_pred)
         adj = (
             y_pred[0, :, :max_num_nodes]
             .reshape(max_num_nodes, max_num_nodes)

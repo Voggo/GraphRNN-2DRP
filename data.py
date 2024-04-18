@@ -1,7 +1,9 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 import networkx as nx
 from generator import generate_rects_and_graph, convert_graph_to_rects
+
 
 
 class DatasetSimple(torch.utils.data.Dataset):
@@ -98,33 +100,6 @@ def generate_datasets(num_graphs, height, width, n_breaks=5):
         data_bfs_edge_dir[nodes_len].append(edge_dir[np.ix_(bfs_index, bfs_index)])
         data_bfs_edge_angle[nodes_len].append(edge_angle[np.ix_(bfs_index, bfs_index)])
 
-        ### Plot the graph
-
-        from plot_rects import plot_rects
-        from dataclasses_rect_point import Rectangle
-        from utils import convert_center_to_lower_left
-        import os
-
-        os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-        # nodes = [
-        #     Rectangle(node[0], node[1], 0) for node in data_bfs_nodes[nodes_len][-1]
-        # ]
-        # rects = convert_graph_to_rects(
-        #     nodes,
-        #     data_bfs_adj[nodes_len][-1],
-        #     data_bfs_edge_dir[nodes_len][-1],
-        #     data_bfs_edge_angle[nodes_len][-1],
-        # )
-        nodes = [
-            Rectangle(node[0], node[1], 0) for node in nodes
-        ]
-        rects = convert_graph_to_rects(nodes, adj, edge_dir, edge_angle)
-        rects = convert_center_to_lower_left(rects)
-            
-
-        plot_rects(rects, ax_lim=width, ay_lim=height, ax_min=-50, ay_min=-50)
-
-        ### End of plot
 
         if len(data_bfs_nodes[nodes_len]) == num_graphs:
             is_full[nodes_len] = True
@@ -153,13 +128,14 @@ class Dataset(torch.utils.data.Dataset):
         self.data_nodes_width = np.load(f"datasets/data_nodes_width_{node_len}.npy")
         self.data_nodes_height = np.load(f"datasets/data_nodes_height_{node_len}.npy")
         self.data_bfs_adj = np.load(f"datasets/data_bfs_adj_{node_len}.npy")
-        self.data_bfs_edge_dir = np.load(f"datasets/data_bfs_edge_dir_{node_len}.npy")
+        self.data_bfs_edge_dir = torch.LongTensor(np.load(f"datasets/data_bfs_edge_dir_{node_len}.npy"))
         self.data_bfs_edge_angle = np.load(
             f"datasets/data_bfs_edge_angle_{node_len}.npy"
         )
         self.max_num_nodes = node_len
-
         self.num_graphs = len(self.data_bfs_nodes)
+        
+        
 
     def bfs_index(self, adj, start):
         """return the index of the nodes in bfs order"""
@@ -175,6 +151,7 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         x = np.zeros((7, self.max_num_nodes + 1, self.max_num_nodes))
         y = np.zeros((3, self.max_num_nodes, self.max_num_nodes))
+        edge_dir = np.array(F.one_hot(self.data_bfs_edge_dir[index], 5))
         x[:, 0:1, :] = np.ones((7, 1, self.max_num_nodes))
         x[0, 1:, :] = np.tril(self.data_bfs_adj[index])
         y[0, :, :] = np.tril(self.data_bfs_adj[index])
@@ -196,8 +173,9 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    generate_datasets(120, 100, 100)
+    # generate_datasets(120, 100, 100)
     data = Dataset(6)
+    data[0]
     # for i in range(10):
     #     d = data[i]
     #     x = d["x"]
