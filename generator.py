@@ -136,7 +136,6 @@ def convert_rects_to_graph(
     """Convert a list of Rectangles to a graph."""
     adjacency_matrix = np.zeros((len(rects), len(rects)), dtype=int)
     edge_directions = np.zeros((len(rects), len(rects)), dtype=int)
-    # edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
     offset = np.zeros((len(rects), len(rects)), dtype=float)
     for i, rect1_enum in enumerate(rects):
         for j, rect2_enum in enumerate(rects):
@@ -211,25 +210,25 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
             q.put(node_to)
             if edge_dir[node_from, node_to] == 2:
                 y_offset = offset[node_from, node_to]
-                x_offset = ((nodes[node_from].width + nodes[node_to].width) / 2)
+                x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
             elif edge_dir[node_from, node_to] == 4:
                 y_offset = offset[node_from, node_to]
-                x_offset = ((nodes[node_from].width + nodes[node_to].width) / 2)
+                x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -x_offset, -y_offset
                 )
             elif edge_dir[node_from, node_to] == 1:
                 x_offset = offset[node_from, node_to]
-                y_offset = ((nodes[node_from].height + nodes[node_to].height) / 2)
+                y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
             elif edge_dir[node_from, node_to] == 3:
                 x_offset = offset[node_from, node_to]
-                y_offset = ((nodes[node_from].height + nodes[node_to].height) / 2)
+                y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -x_offset, -y_offset
                 )
@@ -292,7 +291,6 @@ if __name__ == "__main__":
     bfs_nodes = [nodes[i] for i in bfs_order]
     bfs_adj = adjacency_matrix[np.ix_(bfs_order, bfs_order)]
     bfs_edge_dir = edge_directions[np.ix_(bfs_order, bfs_order)]
-    # bfs_edge_angle = edge_angle[np.ix_(bfs_order, bfs_order)]
     bfs_offset = offset[np.ix_(bfs_order, bfs_order)]
     # show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
 

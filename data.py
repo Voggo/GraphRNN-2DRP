@@ -70,10 +70,10 @@ def generate_datasets(num_graphs, height, width, test=False, n_breaks=5):
     data_nodes_height = {i: [] for i in range(4, max_num_nodes + 1)}
     data_bfs_adj = {i: [] for i in range(4, max_num_nodes + 1)}
     data_bfs_edge_dir = {i: [] for i in range(4, max_num_nodes + 1)}
-    data_bfs_edge_angle = {i: [] for i in range(4, max_num_nodes + 1)}
+    data_bfs_offset = {i: [] for i in range(4, max_num_nodes + 1)}
     is_full = {i: False for i in range(4, max_num_nodes + 1)}
     while True:
-        rects, adj, edge_dir, edge_angle = generate_rects_and_graph(
+        rects, adj, edge_dir, offset = generate_rects_and_graph(
             height, width, n_breaks
         )
         nodes_len = len(rects)
@@ -97,7 +97,7 @@ def generate_datasets(num_graphs, height, width, test=False, n_breaks=5):
         )
         data_bfs_adj[nodes_len].append(adj[np.ix_(bfs_index, bfs_index)])
         data_bfs_edge_dir[nodes_len].append(edge_dir[np.ix_(bfs_index, bfs_index)])
-        data_bfs_edge_angle[nodes_len].append(edge_angle[np.ix_(bfs_index, bfs_index)])
+        data_bfs_offset[nodes_len].append(offset[np.ix_(bfs_index, bfs_index)])
 
         if len(data_bfs_nodes[nodes_len]) == num_graphs:
             is_full[nodes_len] = True
@@ -110,14 +110,14 @@ def generate_datasets(num_graphs, height, width, test=False, n_breaks=5):
         data_nodes_height[i] = np.array(data_nodes_height[i])
         data_bfs_adj[i] = np.array(data_bfs_adj[i])
         data_bfs_edge_dir[i] = np.array(data_bfs_edge_dir[i])
-        data_bfs_edge_angle[i] = np.array(data_bfs_edge_angle[i])
+        data_bfs_offset[i] = np.array(data_bfs_offset[i])
         suffix = "_test" if test else ""
         np.save(f"datasets/data_bfs_nodes_{i}{suffix}.npy", data_bfs_nodes[i])
         np.save(f"datasets/data_nodes_width_{i}{suffix}.npy", data_nodes_width[i])
         np.save(f"datasets/data_nodes_height_{i}{suffix}.npy", data_nodes_height[i])
         np.save(f"datasets/data_bfs_adj_{i}{suffix}.npy", data_bfs_adj[i])
         np.save(f"datasets/data_bfs_edge_dir_{i}{suffix}.npy", data_bfs_edge_dir[i])
-        np.save(f"datasets/data_bfs_edge_angle_{i}{suffix}.npy", data_bfs_edge_angle[i])
+        np.save(f"datasets/data_bfs_offset_{i}{suffix}.npy", data_bfs_offset[i])
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -134,8 +134,8 @@ class Dataset(torch.utils.data.Dataset):
         self.data_bfs_edge_dir = torch.LongTensor(
             np.load(f"datasets/data_bfs_edge_dir_{node_len}{suffix}.npy")
         )
-        self.data_bfs_edge_angle = np.load(
-            f"datasets/data_bfs_edge_angle_{node_len}{suffix}.npy"
+        self.data_bfs_offset = np.load(
+            f"datasets/data_bfs_offset_{node_len}{suffix}.npy"
         )
         self.max_num_nodes = node_len
         self.num_graphs = len(self.data_bfs_nodes)
@@ -169,8 +169,8 @@ class Dataset(torch.utils.data.Dataset):
         x[5, 1:, :] = np.tril(edge_dir[:, :, 4])
         y[5, :, :] = np.tril(edge_dir[:, :, 4])
 
-        x[6, 1:, :] = np.tril(self.data_bfs_edge_angle[index])
-        y[6, :, :] = np.tril(self.data_bfs_edge_angle[index])
+        x[6, 1:, :] = np.tril(self.data_bfs_offset[index])
+        y[6, :, :] = np.tril(self.data_bfs_offset[index])
         x[7, 1:, :] = np.tril(self.data_nodes_width[index].T)
         x[8, 1:, :] = np.tril(self.data_nodes_height[index].T)
         x[9, 1:, :] = np.tril(self.data_nodes_width[index])

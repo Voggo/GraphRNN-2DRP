@@ -316,7 +316,7 @@ def test_inference_rnn_rnn(
         data = Dataset(max_num_nodes, test=True)
         print(data.data_bfs_adj[graph])
         print(data.data_bfs_edge_dir[graph])
-        print(data.data_bfs_edge_angle[graph])
+        print(data.data_bfs_offset[graph])
         nodes = data.data_bfs_nodes[graph]
         x_step = torch.ones(batch_size, 1, max_num_nodes * 9)
         y_pred = torch.zeros(batch_size, max_num_nodes, max_num_nodes * 7)
@@ -369,13 +369,13 @@ def test_inference_rnn_rnn(
         edge_dir.diagonal().fill_(0)
         mapping = torch.tensor([0, 3, 4, 1, 2])
         edge_dir = edge_dir + mapping[edge_dir].T
-        edge_angle = y_pred[0, :, max_num_nodes * 6 :].reshape(
+        offset = y_pred[0, :, max_num_nodes * 6 :].reshape(
             max_num_nodes, max_num_nodes
         )
-        edge_angle.diagonal().fill_(0)
-        edge_angle = edge_angle + edge_angle.T
+        offset.diagonal().fill_(0)
+        offset = offset + offset.T
         nodes = [Rectangle(node[0], node[1], 0) for node in nodes]
-        rects = convert_graph_to_rects(nodes, adj, edge_dir, edge_angle)
+        rects = convert_graph_to_rects(nodes, adj, edge_dir, offset)
         rects = convert_center_to_lower_left(rects)
         plot_rects(
             rects,
@@ -426,7 +426,7 @@ if __name__ == "__main__":
 
     model_sel = "rnn_rnn"
     learning_rate = 0.001
-    epochs = 4000
+    epochs = 500
     batch_size = 10
     hidden_size_1 = 64
     hidden_size_2 = 64
@@ -453,7 +453,7 @@ if __name__ == "__main__":
         ).to(device)
         model = {"nn1": rnn_graph, "nn2": rnn_edge}
 
-    # train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
+    train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
 
     # test_rnn_rnn(device, data, max_num_nodes, model['nn1'], model['nn2'])
 
