@@ -10,7 +10,7 @@ from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
 
-# random.seed(7)
+random.seed(2)
 def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     """Generate a list of Rectangles with n_breaks line breaks in the x and y directions."""
     if width <= 0 or height <= 0 or n_breaks <= 0:
@@ -134,7 +134,8 @@ def convert_rects_to_graph(
     """Convert a list of Rectangles to a graph."""
     adjacency_matrix = np.zeros((len(rects), len(rects)), dtype=int)
     edge_directions = np.zeros((len(rects), len(rects)), dtype=int)
-    edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
+    # edge_angle = np.zeros((len(rects), len(rects)), dtype=float)
+    offset = np.zeros((len(rects), len(rects)), dtype=float)
     for i, rect1_enum in enumerate(rects):
         for j, rect2_enum in enumerate(rects):
             index_i, index_j = i, j
@@ -158,11 +159,15 @@ def convert_rects_to_graph(
                 edge_directions[index_j, index_i] = 4 # 4 is left, 2 is right
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
-                angle = np.arctan2(
-                    rect2_center.y - rect1_center.y, rect2_center.x - rect1_center.x
-                )
-                edge_angle[index_i, index_j] = angle
-                edge_angle[index_j, index_i] = angle
+                y_offset = rect2_center.y - rect1_center.y
+                # x_offset = (rect1.width + rect2.width) / 2
+                offset[index_i, index_j] = y_offset
+                offset[index_j, index_i] = y_offset 
+                # angle = np.arctan2(
+                #     rect2_center.y - rect1_center.y, rect2_center.x - rect1_center.x
+                # )
+                # edge_angle[index_i, index_j] = angle
+                # edge_angle[index_j, index_i] = angle
             elif (
                 (
                     rect1.lower_left.y + rect1.height == rect2.lower_left.y
@@ -180,19 +185,23 @@ def convert_rects_to_graph(
                 edge_directions[index_j, index_i] = 3 # 3 is down, 1 is up
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
-                angle = np.arctan2(
-                    rect2_center.x - rect1_center.x, rect2_center.y - rect1_center.y
-                )
-                edge_angle[index_i, index_j] = angle
-                edge_angle[index_j, index_i] = angle
-    return adjacency_matrix, edge_directions, edge_angle
+                x_offset = rect2_center.x - rect1_center.x
+                # y_offset = (rect1.height + rect2.height) / 2
+                offset[index_i, index_j] = x_offset
+                offset[index_j, index_i] = x_offset
+                # angle = np.arctan2(
+                #     rect2_center.x - rect1_center.x, rect2_center.y - rect1_center.y
+                # )
+                # edge_angle[index_i, index_j] = angle
+                # edge_angle[index_j, index_i] = angle
+    return adjacency_matrix, edge_directions, offset
 
 
-def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
+def convert_graph_to_rects(nodes, adj, edge_dir, offset):
     """Convert a graph to a list of Rectangles."""
     print(adj)
     print(edge_dir)
-    print(edge_ang)
+    print(offset)
     edge_index = np.where(adj == 1)
     queue_index = edge_index[0][0]
     visited = np.zeros(len(nodes), dtype=bool)
@@ -211,42 +220,50 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
             count += 1
             q.put(node_to)
             if edge_dir[node_from, node_to] == 2:
+                # x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
+                # y_offset = (
+                #     (x_offset * np.tan(edge_ang[node_from, node_to]))
+                #     if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
+                #     else 0.0
+                # )
+                y_offset = offset[node_from, node_to]
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
-                y_offset = (
-                    (x_offset * np.tan(edge_ang[node_from, node_to]))
-                    if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
-                    else 0.0
-                )
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
             elif edge_dir[node_from, node_to] == 4:
+                # x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
+                # y_offset = (
+                #     (x_offset * np.tan(edge_ang[node_from, node_to]))
+                #     if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
+                #     else 0.0
+                # )
+                y_offset = offset[node_from, node_to]
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
-                y_offset = (
-                    (x_offset * np.tan(edge_ang[node_from, node_to]))
-                    if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
-                    else 0.0
-                )
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -1 * x_offset, -1 * y_offset
                 )
             elif edge_dir[node_from, node_to] == 1:
+                # y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
+                # x_offset = (
+                #     y_offset * np.tan(edge_ang[node_from, node_to])
+                #     if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
+                #     else 0.0
+                # )
+                x_offset = offset[node_from, node_to]
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
-                x_offset = (
-                    y_offset * np.tan(edge_ang[node_from, node_to])
-                    if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
-                    else 0.0
-                )
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
             elif edge_dir[node_from, node_to] == 3:
+                # y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
+                # x_offset = (
+                #     y_offset * np.tan(edge_ang[node_from, node_to])
+                #     if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
+                #     else 0.0
+                # )
+                x_offset = offset[node_from, node_to]
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
-                x_offset = (
-                    y_offset * np.tan(edge_ang[node_from, node_to])
-                    if not np.isclose(edge_ang[node_from, node_to], 0.0, 1e-2)
-                    else 0.0
-                )
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -1 * x_offset, -1 * y_offset
                 )
@@ -262,10 +279,10 @@ def generate_rects_and_graph(
     while len(reduced_rects) == 1:
         rects = generate_rects(width, height, n_breaks)
         reduced_rects = reduce_rects(rects, convergence_limit=100)
-    adjacency_matrix, edge_directions, edge_angle = convert_rects_to_graph(
+    adjacency_matrix, edge_directions, offset = convert_rects_to_graph(
         reduced_rects
     )
-    return reduced_rects, adjacency_matrix, edge_directions, edge_angle
+    return reduced_rects, adjacency_matrix, edge_directions, offset
 
 
 def show_graph_with_labels(adjacency_matrix, mylabels):
@@ -290,7 +307,7 @@ if __name__ == "__main__":
         reduced_rects,
         adjacency_matrix,
         edge_directions,
-        edge_angle,
+        offset,
     ) = generate_rects_and_graph(50, 50, 6)
     plot_rects(
         reduced_rects, ax_lim=50, ay_lim=50, filename="test_graph.png", show=False
@@ -307,11 +324,12 @@ if __name__ == "__main__":
     bfs_nodes = ([nodes[i] for i in bfs_order])
     bfs_adj = adjacency_matrix[np.ix_(bfs_order, bfs_order)]
     bfs_edge_dir = edge_directions[np.ix_(bfs_order, bfs_order)]
-    bfs_edge_angle = edge_angle[np.ix_(bfs_order, bfs_order)]
+    # bfs_edge_angle = edge_angle[np.ix_(bfs_order, bfs_order)]
+    bfs_offset = offset[np.ix_(bfs_order, bfs_order)]
     # show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
 
     rects_again = convert_graph_to_rects(
-        bfs_nodes, bfs_adj, bfs_edge_dir, bfs_edge_angle
+        bfs_nodes, bfs_adj, bfs_edge_dir, offset
     )
     rects_again = convert_center_to_lower_left(rects_again)
     plot_rects(
