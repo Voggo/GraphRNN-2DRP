@@ -192,6 +192,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, edge_ang):
     """Convert a graph to a list of Rectangles."""
     print(adj)
     print(edge_dir)
+    print(edge_ang)
     edge_index = np.where(adj == 1)
     queue_index = edge_index[0][0]
     visited = np.zeros(len(nodes), dtype=bool)

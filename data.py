@@ -63,7 +63,7 @@ def get_bfs_index(adj, start):
     return nodes
 
 
-def generate_datasets(num_graphs, height, width, n_breaks=5):
+def generate_datasets(num_graphs, height, width, test=False, n_breaks=5):
     max_num_nodes = 15
     data_bfs_nodes = {i: [] for i in range(4, max_num_nodes + 1)}
     data_nodes_width = {i: [] for i in range(4, max_num_nodes + 1)}
@@ -111,26 +111,31 @@ def generate_datasets(num_graphs, height, width, n_breaks=5):
         data_bfs_adj[i] = np.array(data_bfs_adj[i])
         data_bfs_edge_dir[i] = np.array(data_bfs_edge_dir[i])
         data_bfs_edge_angle[i] = np.array(data_bfs_edge_angle[i])
-
-        np.save(f"datasets/data_bfs_nodes_{i}.npy", data_bfs_nodes[i])
-        np.save(f"datasets/data_nodes_width_{i}.npy", data_nodes_width[i])
-        np.save(f"datasets/data_nodes_height_{i}.npy", data_nodes_height[i])
-        np.save(f"datasets/data_bfs_adj_{i}.npy", data_bfs_adj[i])
-        np.save(f"datasets/data_bfs_edge_dir_{i}.npy", data_bfs_edge_dir[i])
-        np.save(f"datasets/data_bfs_edge_angle_{i}.npy", data_bfs_edge_angle[i])
+        suffix = "_test" if test else ""
+        np.save(f"datasets/data_bfs_nodes_{i}{suffix}.npy", data_bfs_nodes[i])
+        np.save(f"datasets/data_nodes_width_{i}{suffix}.npy", data_nodes_width[i])
+        np.save(f"datasets/data_nodes_height_{i}{suffix}.npy", data_nodes_height[i])
+        np.save(f"datasets/data_bfs_adj_{i}{suffix}.npy", data_bfs_adj[i])
+        np.save(f"datasets/data_bfs_edge_dir_{i}{suffix}.npy", data_bfs_edge_dir[i])
+        np.save(f"datasets/data_bfs_edge_angle_{i}{suffix}.npy", data_bfs_edge_angle[i])
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, node_len):
-        self.data_bfs_nodes = np.load(f"datasets/data_bfs_nodes_{node_len}.npy")
-        self.data_nodes_width = np.load(f"datasets/data_nodes_width_{node_len}.npy")
-        self.data_nodes_height = np.load(f"datasets/data_nodes_height_{node_len}.npy")
-        self.data_bfs_adj = np.load(f"datasets/data_bfs_adj_{node_len}.npy")
+    def __init__(self, node_len, test=False):
+        suffix = "_test" if test else ""
+        self.data_bfs_nodes = np.load(f"datasets/data_bfs_nodes_{node_len}{suffix}.npy")
+        self.data_nodes_width = np.load(
+            f"datasets/data_nodes_width_{node_len}{suffix}.npy"
+        )
+        self.data_nodes_height = np.load(
+            f"datasets/data_nodes_height_{node_len}{suffix}.npy"
+        )
+        self.data_bfs_adj = np.load(f"datasets/data_bfs_adj_{node_len}{suffix}.npy")
         self.data_bfs_edge_dir = torch.LongTensor(
-            np.load(f"datasets/data_bfs_edge_dir_{node_len}.npy")
+            np.load(f"datasets/data_bfs_edge_dir_{node_len}{suffix}.npy")
         )
         self.data_bfs_edge_angle = np.load(
-            f"datasets/data_bfs_edge_angle_{node_len}.npy"
+            f"datasets/data_bfs_edge_angle_{node_len}{suffix}.npy"
         )
         self.max_num_nodes = node_len
         self.num_graphs = len(self.data_bfs_nodes)
@@ -176,9 +181,9 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    # generate_datasets(120, 100, 100)
-    data = Dataset(6)
-    x = data[0]['x']
+    generate_datasets(360, 100, 100, test=True)
+    data = Dataset(6, test=True)
+    x = data[0]["x"]
     print(x)
     # for i in range(10):
     #     d = data[i]
