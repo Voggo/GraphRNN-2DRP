@@ -307,4 +307,4 @@ if __name__ == "__main__":
     )
     show_graph_with_labels(bfs_adj, {i: i for i in range(len(bfs_nodes))})
 
-    # print(bfs_adj)
+    print(bfs_adj)

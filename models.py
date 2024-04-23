@@ -313,7 +313,7 @@ def test_inference_rnn_rnn(
     with torch.no_grad():
         rnn_graph.eval()
         rnn_edge.eval()
-        data = Dataset(max_num_nodes, test=True)
+        data = Dataset(max_num_nodes, test=False)
         print(data.data_bfs_adj[graph])
         print(data.data_bfs_edge_dir[graph])
         print(data.data_bfs_offset[graph])
@@ -369,9 +369,7 @@ def test_inference_rnn_rnn(
         edge_dir.diagonal().fill_(0)
         mapping = torch.tensor([0, 3, 4, 1, 2])
         edge_dir = edge_dir + mapping[edge_dir].T
-        offset = y_pred[0, :, max_num_nodes * 6 :].reshape(
-            max_num_nodes, max_num_nodes
-        )
+        offset = y_pred[0, :, max_num_nodes * 6 :].reshape(max_num_nodes, max_num_nodes)
         offset.diagonal().fill_(0)
         offset = offset + offset.T
         nodes = [Rectangle(node[0], node[1], 0) for node in nodes]
@@ -426,15 +424,15 @@ if __name__ == "__main__":
 
     model_sel = "rnn_rnn"
     learning_rate = 0.001
-    epochs = 500
+    epochs = 1000
     batch_size = 10
     hidden_size_1 = 64
     hidden_size_2 = 64
     num_layers = 4
 
-    for i in range(100):
-        test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 6, i, num_layers)
-    dataset = Dataset(6, test=False)
+    # for i in range(5):
+        # test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 6, i, num_layers)
+    dataset = Dataset(5, test=False)
 
     max_num_nodes = dataset.max_num_nodes
 
