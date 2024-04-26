@@ -5,55 +5,6 @@ import networkx as nx
 from generator import generate_rects_and_graph, convert_graph_to_rects
 
 
-class DatasetSimple(torch.utils.data.Dataset):
-    def __init__(self, num_graphs, height, width):
-        self.n_breaks = 5
-        self.data_adj = []
-        self.data_bfs_adj = []
-        self.max_num_nodes = 0
-
-        self.num_graphs = num_graphs
-
-        for _ in range(num_graphs):
-            rects, adj, _, _ = generate_rects_and_graph(height, width, self.n_breaks)
-            nodes = list(map(lambda x: x.get_as_node(), rects))
-            self.max_num_nodes = max(self.max_num_nodes, len(nodes))
-            self.data_adj.append(adj)
-            bfs_index = self.bfs_index(adj, 0)
-            self.data_bfs_adj.append(adj[np.ix_(bfs_index, bfs_index)])
-
-        for i, bfs_adj in enumerate(self.data_bfs_adj):
-            # Calculate padding size
-            pad_size = self.max_num_nodes - bfs_adj.shape[0]
-
-            # Pad the array
-            if pad_size > 0:
-                self.data_bfs_adj[i] = np.pad(
-                    bfs_adj, ((0, pad_size), (0, pad_size)), mode="constant"
-                )
-
-    def bfs_index(self, adj, start):
-        """return the index of the nodes in bfs order"""
-        graph = nx.from_numpy_array(adj)
-        bfs_edges = nx.bfs_edges(graph, start)
-        nodes = [start] + [v for u, v in bfs_edges]
-        print(nodes)
-        return nodes
-
-    def __len__(self):
-        return self.num_graphs
-
-    def __getitem__(self, index):
-        x = np.zeros((self.max_num_nodes + 1, self.max_num_nodes))
-        y = np.zeros((self.max_num_nodes + 1, self.max_num_nodes))
-        x[0, :] = np.ones((1, self.max_num_nodes))
-        y[:-1, :] = self.data_bfs_adj[index]
-        x[1:, :] = self.data_bfs_adj[index]
-        y = torch.tensor(y)
-        x = torch.tensor(x)
-        return {"x": x, "y": y}
-
-
 def get_bfs_index(adj, start):
     """return the index of the nodes in bfs order"""
     graph = nx.from_numpy_array(adj)
@@ -181,7 +132,7 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    generate_datasets(360, 100, 100, test=True)
+    generate_datasets(1000, 100, 100, test=False)
     data = Dataset(6, test=True)
     x = data[0]["x"]
     print(x)
