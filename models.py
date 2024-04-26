@@ -143,9 +143,9 @@ def train_rnn_rnn(
     epochs,
     max_num_nodes,
     training_data,
-    lambda_kl_adj=0.20,
-    lambda_kl_dir=0.50,
-    lambda_l2=0.30,
+    lambda_kl_adj=0.30,
+    lambda_kl_dir=0.60,
+    lambda_l2=0.10,
 ):
     optimizer_rnn_graph = torch.optim.Adam(
         list(rnn_graph.parameters()), lr=learning_rate
@@ -163,7 +163,7 @@ def train_rnn_rnn(
         loss_sum = 0
         loss_bce_adj_sum = 0
         loss_bce_dir_sum = 0
-        loss_mse_sum = 0
+        loss_mae_sum = 0
         for batch in training_data:
             rnn_graph.zero_grad()
             rnn_edge.zero_grad()
@@ -229,7 +229,7 @@ def train_rnn_rnn(
                 y_pred[:, :, max_num_nodes : max_num_nodes * 6],
                 y[:, :, max_num_nodes : max_num_nodes * 6],
             )
-            loss_l2 = F.mse_loss(
+            loss_l2 = F.l1_loss(
                 y_pred[:, :, max_num_nodes * 6 :], y[:, :, max_num_nodes * 6 :]
             )
             loss = (
@@ -240,7 +240,7 @@ def train_rnn_rnn(
             loss_sum += loss.item()
             loss_bce_adj_sum += loss_kl_adj.item() * lambda_kl_adj
             loss_bce_dir_sum += loss_kl_dir.item() * lambda_kl_dir
-            loss_mse_sum += loss_l2.item() * lambda_l2
+            loss_mae_sum += loss_l2.item() * lambda_l2
             loss.backward()
             optimizer_rnn_graph.step()
             optimizer_rnn_edge.step()
@@ -248,7 +248,7 @@ def train_rnn_rnn(
         scheduler_rnn_edge.step()
         if epoch % 5 == 0:
             print(
-                f"epoch: {epoch}, loss: {loss_sum/5}, bce adj: {loss_bce_adj_sum/5}, bce dir: {loss_bce_dir_sum/5}, mse: {loss_mse_sum/5}"
+                f"epoch: {epoch}, loss: {loss_sum/5}, bce adj: {loss_bce_adj_sum/5}, bce dir: {loss_bce_dir_sum/5}, mae: {loss_mae_sum/5}"
             )
         if epoch % 100 == 0 and not epoch == 0:
             torch.save(
@@ -295,7 +295,7 @@ def test_rnn_rnn(device, training_data, max_num_nodes, rnn_graph, rnn_edge):
             loss_k2 = F.binary_cross_entropy(
                 y_pred[:, :, :max_num_nodes], y[:, :, :max_num_nodes]
             )
-            loss_l2 = F.mse_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
+            loss_l2 = F.mae_loss(y_pred[:, :, max_num_nodes:], y[:, :, max_num_nodes:])
             loss = loss_k2 + loss_l2
             loss_sum += loss.item()
             print(f"loss: {loss.item()}")
@@ -313,7 +313,7 @@ def test_inference_rnn_rnn(
     with torch.no_grad():
         rnn_graph.eval()
         rnn_edge.eval()
-        data = Dataset(max_num_nodes, test=False)
+        data = Dataset(max_num_nodes, test=True)
         print(data.data_bfs_adj[graph])
         print(data.data_bfs_edge_dir[graph])
         print(data.data_bfs_offset[graph])
@@ -430,9 +430,9 @@ if __name__ == "__main__":
     hidden_size_2 = 64
     num_layers = 4
 
-    # for i in range(5):
-        # test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 6, i, num_layers)
-    dataset = Dataset(5, test=False)
+    for i in range(5):
+        test_inference_rnn_rnn(device, hidden_size_1, hidden_size_2, 6, i, num_layers)
+    dataset = Dataset(6, test=True)
 
     max_num_nodes = dataset.max_num_nodes
 
@@ -451,7 +451,7 @@ if __name__ == "__main__":
         ).to(device)
         model = {"nn1": rnn_graph, "nn2": rnn_edge}
 
-    train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
+    # train(model, model_sel, device, learning_rate, epochs, max_num_nodes, data)
 
     # test_rnn_rnn(device, data, max_num_nodes, model['nn1'], model['nn2'])
 

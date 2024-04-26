@@ -181,8 +181,8 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    generate_datasets(360, 100, 100, test=True)
-    data = Dataset(6, test=True)
+    generate_datasets(120, 100, 100, test=True)
+    data = Dataset(1, test=True)
     x = data[0]["x"]
     print(x)
     # for i in range(10):
