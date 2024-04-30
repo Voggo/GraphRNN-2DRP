@@ -15,7 +15,7 @@ def get_bfs_index(adj, start):
 
 
 def generate_datasets(num_graphs, height, width, test=False, n_breaks=5):
-    max_num_nodes = 15
+    max_num_nodes = 12
     data_bfs_nodes = {i: [] for i in range(4, max_num_nodes + 1)}
     data_nodes_width = {i: [] for i in range(4, max_num_nodes + 1)}
     data_nodes_height = {i: [] for i in range(4, max_num_nodes + 1)}
@@ -132,7 +132,7 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    generate_datasets(1000, 100, 100, test=False)
+    generate_datasets(10000, 100, 100, test=False)
     data = Dataset(6, test=True)
     x = data[0]["x"]
     print(x)

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
+from eval_solutions import evaluate_solution
 
 # random.seed(4)
 
@@ -188,9 +189,6 @@ def convert_rects_to_graph(
 
 def convert_graph_to_rects(nodes, adj, edge_dir, offset):
     """Convert a graph to a list of Rectangles."""
-    print(adj)
-    print(edge_dir)
-    print(offset)
     edge_index = np.where(adj == 1)
     queue_index = edge_index[0][0]
     visited = np.zeros(len(nodes), dtype=bool)
@@ -232,6 +230,8 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -x_offset, -y_offset
                 )
+            else:
+                raise ValueError("Invalid edge direction")
     return nodes
 
 
@@ -296,6 +296,7 @@ if __name__ == "__main__":
 
     rects_again = convert_graph_to_rects(bfs_nodes, bfs_adj, bfs_edge_dir, bfs_offset)
     rects_again = convert_center_to_lower_left(rects_again)
+    print(evaluate_solution(rects_again, 50, 50))
     plot_rects(
         rects_again,
         ax_min=-50,

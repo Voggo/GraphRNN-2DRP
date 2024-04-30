@@ -1,6 +1,9 @@
 import numpy as np
 from typing import List
 import random
+import networkx as nx
+
+# from littleballoffur import LoopErasedRandomWalkSampler, NonBackTrackingRandomWalkSampler
 
 from dataclasses_rect_point import Rectangle, Point
 
@@ -48,3 +51,29 @@ def rectangles_overlap(rect1: Rectangle, rect2: Rectangle) -> bool:
         and rect1.lower_left.y < rect2.lower_left.y + rect2.height
         and rect1.lower_left.y + rect1.height > rect2.lower_left.y
     )
+
+
+def sample_graph(adj: np.ndarray) -> np.ndarray:
+    """Sample random neighbours from an adjacency matrix until all nodes are visited.
+    Return adjacency matrix of the sampled edges."""
+    n = adj.shape[0]
+    visited = [False] * n
+    for i in range(n):
+        if sum(adj[i,:]) == 0:
+            print("Node", i, "has no neighbours")
+            return adj
+    visited[random.randint(0, n - 1)] = True
+    graph = nx.from_numpy_array(adj)
+    new_adj = np.zeros((n, n))
+    while not all(visited):
+        start = random.choice([i for i, v in enumerate(visited) if v])
+        neighbours = list(graph.neighbors(start))
+        if not neighbours:
+            continue
+        next_node = random.choice(neighbours)
+        if visited[next_node]:
+            continue
+        visited[next_node] = True
+        new_adj[start][next_node] = 1
+        new_adj[next_node][start] = 1
+    return new_adj
