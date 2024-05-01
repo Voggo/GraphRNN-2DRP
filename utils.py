@@ -60,7 +60,7 @@ def sample_graph(adj: np.ndarray) -> np.ndarray:
     visited = [False] * n
     for i in range(n):
         if sum(adj[i,:]) == 0:
-            print("Node", i, "has no neighbours")
+            # print("Node", i, "has no neighbours")
             return adj
     visited[random.randint(0, n - 1)] = True
     graph = nx.from_numpy_array(adj)

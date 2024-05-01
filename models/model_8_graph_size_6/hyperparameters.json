@@ -1,0 +1,19 @@
+{
+    "learning_rate": 0.001,
+    "epochs": 3000,
+    "learning_rate_steps": [
+        1000,
+        2400
+    ],
+    "batch_size": 15,
+    "hidden_size_1": 64,
+    "hidden_size_2": 64,
+    "num_layers": 4,
+    "data_graph_size": 6,
+    "lambda_ratios": {
+        "kl_adj": 0.2,
+        "kl_dir": 0.77,
+        "l1": 0.03
+    },
+    "sample_size": 1000
+}

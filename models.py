@@ -208,7 +208,6 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
         f"models/{model_dir_name}_graph_size_{num_nodes}/hyperparameters.json", "r"
     ) as f:
         hp = json.load(f)
-    lambda_ratios = hp["lambda_ratios"]
     rnn_graph = RNN(
         (9 * num_nodes),
         hp["hidden_size_1"],
@@ -242,7 +241,7 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
         losses = []
         losses_bce_adj = []
         losses_bce_dir = []
-        losses_mse = []
+        losses_mae = []
         for batch in test_data:
             x_bumpy = batch["x"].float().to(device)
             y_bumpy = batch["y"].float().to(device)
@@ -310,34 +309,34 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                 y_pred[:, :, num_nodes : num_nodes * 6],
                 y[:, :, num_nodes : num_nodes * 6],
             )
-            loss_l2 = F.mse_loss(
+            loss_l1 = F.l1_loss(
                 y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :]
             )
             loss = (
-                lambda_ratios["kl_adj"] * loss_kl_adj
-                + lambda_ratios["kl_dir"] * loss_kl_dir
-                + lambda_ratios["l1"] * loss_l2
+                loss_kl_adj
+                + loss_kl_dir
+                + loss_l1
             )
             losses.append(loss.item())
             losses_bce_adj.append(loss_kl_adj.item())
             losses_bce_dir.append(loss_kl_dir.item())
-            losses_mse.append(loss_l2.item())
+            losses_mae.append(loss_l1.item())
             print(
-                f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mse: {loss_l2.item()}"
+                f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mae: {loss_l1.item()}"
             )
         losses_mean = sum(losses) / len(losses)
         losses_bce_adj_mean = sum(losses_bce_adj) / len(losses_bce_adj)
         losses_bce_dir_mean = sum(losses_bce_dir) / len(losses_bce_dir)
-        losses_mse_mean = sum(losses_mse) / len(losses_mse)
+        losses_mse_mean = sum(losses_mae) / len(losses_mae)
         print(
             f"mean loss: {losses_mean}",
-            f"mean bce adj: {losses_bce_adj_mean}, bce dir: {losses_bce_dir_mean}, mse: {losses_mse_mean}",
+            f"mean bce adj: {losses_bce_adj_mean}, mean bce dir: {losses_bce_dir_mean}, mean mae: {losses_mse_mean}",
         )
         losses = {
             "losses": losses,
             "losses_bce_adj": losses_bce_adj,
             "losses_bce_dir": losses_bce_dir,
-            "losses_mse": losses_mse,
+            "losses_mse": losses_mae,
         }
         json.dump(
             losses,
@@ -441,7 +440,7 @@ def test_inference_rnn(
         best_rects = None
         max_fill_ratio = 0
         min_overlap_area = 100000000
-        for _ in range(5000):
+        for _ in range(1000):
             nodes_rects = [Rectangle(node[0].item(), node[1].item(), 0) for node in nodes]
             sampled_graph = sample_graph(adj.numpy())
             rects = convert_graph_to_rects(nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy())
@@ -538,23 +537,24 @@ if __name__ == "__main__":
     # "train" or "test"
     mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_7"
+    model_dir_name = "model_10"
+    # Size of the graph you want to train or test on
+    data_graph_size = 10
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 1000
+    epochs = 4000
     learning_rate_steps = [epochs // 3, epochs // 5 * 4]
-    batch_size = 20
+    batch_size = 1
     hidden_size_1 = 64
     hidden_size_2 = 64
     num_layers = 4
-    data_graph_size = 6
     lambda_ratios = {"kl_adj": 0.20, "kl_dir": 0.77, "l1": 0.03}
     
     sample_size = 0 # automatically set
 
     if mode == "test":
-        dataset = Dataset(data_graph_size, test=False)
+        dataset = Dataset(data_graph_size, test=True)
         data = torch.utils.data.DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
