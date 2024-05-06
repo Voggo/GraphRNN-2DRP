@@ -1,0 +1,1 @@
+{"learning_rate": 0.001, "epochs": 500, "learning_rate_steps": [166, 400], "batch_size": 1, "hidden_size_1": 64, "hidden_size_2": 64, "num_layers": 4, "data_graph_size": 10, "lambda_ratios": {"kl_adj": 0.5, "kl_dir": 0.48, "l1": 0.02}, "sample_size": 1}

@@ -19,38 +19,41 @@ class RNN(torch.nn.Module):
     def __init__(
         self,
         input_size,
+        embedding_size,
         hidden_size,
         num_layers,
-        has_output=False,
         output_size=1,
         output_hidden_size=16,
     ):
         super(RNN, self).__init__()
-        self.has_output = has_output
+
         self.num_layers = num_layers
+        
+        self.embedding = torch.nn.Linear(input_size, embedding_size)
+        self.relu = torch.nn.ReLU()
         self.rnn = torch.nn.GRU(
-            input_size=input_size,
+            input_size=embedding_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
         )
-        if has_output:
-            self.output = torch.nn.Sequential(
-                torch.nn.Linear(hidden_size, output_hidden_size),
-                torch.nn.ReLU(),
-                torch.nn.Linear(output_hidden_size, output_size),
-            )
+
+        self.output = torch.nn.Sequential(
+            torch.nn.Linear(hidden_size, output_hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.Linear(output_hidden_size, output_size),
+        )
         self.hidden = None
 
     def init_hidden(self, batch_size):
         return torch.zeros(self.num_layers, batch_size, self.rnn.hidden_size)
 
     def forward(self, x):
-        output, self.hidden = self.rnn(x, self.hidden)
-        if self.has_output:
-            output_embed = self.output(output.clone())
-            return output, output_embed
-        return output
+        input = self.embedding(x)
+        input = self.relu(input)
+        output, self.hidden = self.rnn(input, self.hidden)
+        output_embed = self.output(output.clone())
+        return output, output_embed
 
 
 def train_rnn(
@@ -144,12 +147,12 @@ def train_rnn(
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            y_pred_adj = y_pred[:, :, :num_nodes].clone()
-            y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
-            y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
-            y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
-            y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
-            y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
+            # y_pred_adj = y_pred[:, :, :num_nodes].clone()
+            # y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -209,17 +212,17 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
     ) as f:
         hp = json.load(f)
     rnn_graph = RNN(
-        (9 * num_nodes),
+        9 * num_nodes,
+        4 * num_nodes,
         hp["hidden_size_1"],
         hp["num_layers"],
-        has_output=True,
         output_size=11,
     ).to(device)
     rnn_edge = RNN(
         11,
+        16,
         hp["hidden_size_2"],
         hp["num_layers"],
-        has_output=True,
         output_size=7,
     )
     rnn_graph.load_state_dict(
@@ -296,12 +299,12 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            y_pred_adj = y_pred[:, :, :num_nodes].clone()
-            y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
-            y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
-            y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
-            y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
-            y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
+            # y_pred_adj = y_pred[:, :, :num_nodes].clone()
+            # y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
+            # y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -358,9 +361,9 @@ def test_inference_rnn(
     batch_size=1,
 ):
     rnn_graph = RNN(
-        (num_nodes * 9), hidden_size_1, num_layers, has_output=True, output_size=11
+        num_nodes * 9, num_nodes * 4, hidden_size_1, num_layers, output_size=11
     ).to(device)
-    rnn_edge = RNN(11, hidden_size_2, num_layers, has_output=True, output_size=7).to(
+    rnn_edge = RNN(11, 16, hidden_size_2, num_layers, output_size=7).to(
         device
     )
     rnn_graph.load_state_dict(
@@ -395,7 +398,7 @@ def test_inference_rnn(
                 output_edge[:, 0, 0:1] = torch.bernoulli(
                     F.sigmoid(output_edge[:, 0, 0:1])
                 )
-                dir = torch.multinomial(F.sigmoid(output_edge[:, 0, 1:6]), 1)
+                dir = torch.argmax(F.sigmoid(output_edge[:, 0, 1:6]), 1)
                 output_edge[:, 0, 1 + dir] = 1
                 output_edge[:, 0, 1 : dir + 1] = 0
                 output_edge[:, 0, dir + 2 : 6] = 0
@@ -497,8 +500,8 @@ def train(
     print(f"max nodes: {num_nodes}")
     override = False
     if (
-        os.path.isfile(f"models/rnn_graph_model_{num_nodes}.pth")
-        or os.path.isfile(f"models/rnn_edge_model_{num_nodes}.pth")
+        os.path.isfile(f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth")
+        or os.path.isfile(f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth")
         or override
     ):
         input("Models already exist. Press enter to continue")
@@ -535,26 +538,26 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # "train" or "test"
-    mode = "test"
+    mode = "train"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_10"
+    model_dir_name = "model_14"
     # Size of the graph you want to train or test on
     data_graph_size = 10
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 4000
+    epochs = 500
     learning_rate_steps = [epochs // 3, epochs // 5 * 4]
     batch_size = 1
     hidden_size_1 = 64
     hidden_size_2 = 64
     num_layers = 4
-    lambda_ratios = {"kl_adj": 0.20, "kl_dir": 0.77, "l1": 0.03}
+    lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.48, "l1": 0.02}
     
     sample_size = 0 # automatically set
 
     if mode == "test":
-        dataset = Dataset(data_graph_size, test=True)
+        dataset = Dataset(data_graph_size, test=False)
         data = torch.utils.data.DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
@@ -581,17 +584,17 @@ if __name__ == "__main__":
         )
 
         rnn_graph = RNN(
-            (data_graph_size * 9),
+            data_graph_size * 9,
+            data_graph_size * 4,
             hidden_size_1,
             num_layers,
-            has_output=True,
             output_size=11,
         ).to(device)
         rnn_edge = RNN(
             11,
+            16,
             hidden_size_2,
             num_layers,
-            has_output=True,
             output_size=7,
         ).to(device)
         train(
