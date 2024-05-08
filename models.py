@@ -83,7 +83,7 @@ def train_rnn(
     losses = []
     losses_bce_adj = []
     losses_bce_dir = []
-    losses_mse = []
+    losses_mae = []
     for epoch in range(epochs):
         loss_sum = 0
         loss_sum_adj = 0
@@ -147,12 +147,12 @@ def train_rnn(
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            # y_pred_adj = y_pred[:, :, :num_nodes].clone()
-            # y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
+            y_pred_adj = y_pred[:, :, :num_nodes].clone()
+            y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
+            y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
+            y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
+            y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
+            y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -167,9 +167,9 @@ def train_rnn(
                 + lambda_ratios["l1"] * loss_l1
             )
             loss_sum += loss.item()
-            loss_sum_adj += loss_kl_adj.item() * lambda_ratios["kl_adj"]
-            loss_sum_dir += loss_kl_dir.item() * lambda_ratios["kl_dir"]
-            loss_sum_l1 += loss_l1.item() * lambda_ratios["l1"]
+            loss_sum_adj += loss_kl_adj.item()
+            loss_sum_dir += loss_kl_dir.item()
+            loss_sum_l1 += loss_l1.item()
             loss.backward()
             optimizer_rnn_graph.step()
             optimizer_rnn_edge.step()
@@ -179,10 +179,10 @@ def train_rnn(
         losses.append(loss_sum / batches)
         losses_bce_adj.append(loss_sum_adj / batches)
         losses_bce_dir.append(loss_sum_dir / batches)
-        losses_mse.append(loss_sum_l1 / batches)
+        losses_mae.append(loss_sum_l1 / batches)
         if epoch % 5 == 0:
             print(
-                f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mse: {losses_mse[-1]}"
+                f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mae: {losses_mae[-1]}"
             )
         if epoch % 100 == 0 and not epoch == 0:
             torch.save(
@@ -202,7 +202,7 @@ def train_rnn(
         rnn_edge.state_dict(),
         f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth",
     )
-    return rnn_graph, rnn_edge, losses, losses_bce_adj, losses_bce_dir, losses_mse
+    return rnn_graph, rnn_edge, losses, losses_bce_adj, losses_bce_dir, losses_mae
 
 
 def test_rnn(device, num_nodes, model_dir_name, test_data):
@@ -299,12 +299,12 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            # y_pred_adj = y_pred[:, :, :num_nodes].clone()
-            # y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
+            y_pred_adj = y_pred[:, :, :num_nodes].clone()
+            y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
+            y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
+            y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
+            y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
+            y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -339,7 +339,7 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
             "losses": losses,
             "losses_bce_adj": losses_bce_adj,
             "losses_bce_dir": losses_bce_dir,
-            "losses_mse": losses_mae,
+            "losses_mae": losses_mae,
         }
         json.dump(
             losses,
