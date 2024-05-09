@@ -24,7 +24,7 @@ def get_plt_rects(rects: List[Rectangle]):
             )
             plt_rects.append(plt_rect)
         except ValueError as e:
-            print(e)
+            e = str(e)
     return plt_rects
 
 

@@ -445,6 +445,10 @@ def test_inference_rnn(
         offset = offset + offset.T
         print("current adj:")
         print(adj)
+        print("current edge dir:")
+        print(edge_dir)
+        print("current offset:")
+        print(offset)
         # Convert edge_dir to boolean tensor where True indicates the presence of an edge
         edge_mask = edge_dir > 0
         # Use the mask to filter the adjacency matrix
@@ -454,8 +458,8 @@ def test_inference_rnn(
         min_overlap_area = 100000000
         for _ in range(1000):
             nodes_rects = [Rectangle(node[0].item(), node[1].item(), 0) for node in nodes]
-            # sampled_graph = sample_graph(adj.numpy())
-            sampled_graph = adj.numpy()
+            sampled_graph = sample_graph(adj.numpy())
+            # sampled_graph = adj.numpy()
             rects = convert_graph_to_rects(nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy())
             rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area = evaluate_solution(rects, 100, 100)
@@ -548,20 +552,20 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # "train" or "test"
-    mode = "train"
+    mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_19"
+    model_dir_name = "model_22"
     # Size of the graph you want to train or test on
-    data_graph_size = 10
+    data_graph_size = 6
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 8000
+    epochs = 10000
     learning_rate_steps = [epochs // 2, epochs // 5 * 4]
     batch_size = 1
-    hidden_size_1 = 128
-    hidden_size_2 = 32
-    num_layers = 4
+    hidden_size_1 = 256
+    hidden_size_2 = 128
+    num_layers = 5
     lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.40, "l1": 0.10}
     
     sample_size = 0 # automatically set
