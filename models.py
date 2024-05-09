@@ -123,13 +123,13 @@ def train_rnn(
                 dim=2,
             ).to(device)
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0)).to(device)
-            output_graph, output_embed = rnn_graph(x)
+            _, output_embed = rnn_graph(x)
             y_pred = torch.zeros(x.size(0), num_nodes - 1, num_nodes * 7).to(device)
             for i in range(num_nodes - 1):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0)).to(device)
-                rnn_edge.hidden[0, :, :] = output_graph[:, i, :].to(device)
+                rnn_edge.hidden[0, :, :] = output_embed[:, i, :].to(device)
                 edge_input = x_bumpy[:, :, :, i].transpose(-2, -1).to(device)
-                edge_input[:, 0, :] = output_embed[:, i, :].clone().to(device)
+                edge_input[:, 0, :] = torch.ones((batch_size, 1, 11)).to(device)
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
                 output_edge = output_edge[:, :, :]
@@ -218,7 +218,7 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
         4 * num_nodes,
         hp["hidden_size_1"],
         hp["num_layers"],
-        output_size=11,
+        output_size=hp["hidden_size_2"],
     ).to(device)
     rnn_edge = RNN(
         11,
@@ -277,13 +277,13 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                 dim=2,
             ).to(device)
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0)).to(device)
-            output_graph, output_embed = rnn_graph(x)
+            _, output_embed = rnn_graph(x)
             y_pred = torch.zeros(x.size(0), num_nodes - 1, num_nodes * 7).to(device)
             for i in range(num_nodes - 1):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0)).to(device)
-                rnn_edge.hidden[0, :, :] = output_graph[:, i, :].to(device)
+                rnn_edge.hidden[0, :, :] = output_embed[:, i, :].to(device)
                 edge_input = x_bumpy[:, :, :, i].transpose(-2, -1).to(device)
-                edge_input[:, 0, :] = output_embed[:, i, :].clone().to(device)
+                edge_input[:, 0, :] = torch.ones((batch_size, 1, 11)).to(device)
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
                 output_edge = output_edge[:, :, :]
@@ -366,7 +366,7 @@ def test_inference_rnn(
     batch_size=1,
 ):
     rnn_graph = RNN(
-        num_nodes * 9, num_nodes * 4, hidden_size_1, num_layers, output_size=11
+        num_nodes * 9, num_nodes * 4, hidden_size_1, num_layers, output_size=hidden_size_2
     ).to(device)
     rnn_edge = RNN(11, 16, hidden_size_2, num_layers, output_size=7).to(
         device
@@ -397,8 +397,8 @@ def test_inference_rnn(
         for i in range(num_nodes):
             output_graph, output_embed = rnn_graph(x_step)
             rnn_edge.hidden = rnn_edge.init_hidden(batch_size).to(device)
-            rnn_edge.hidden[0, :, :] = output_graph[:, -1, :]
-            edge_input_step = output_embed
+            rnn_edge.hidden[0, :, :] = output_embed[:, -1, :]
+            edge_input_step = torch.ones(batch_size, 1, 11).to(device)
             edge_y_pred = torch.zeros(batch_size, num_nodes, 9).to(device)
             for j in range(i + 1):
                 _, output_edge = rnn_edge(edge_input_step)
@@ -452,7 +452,7 @@ def test_inference_rnn(
         best_rects = None
         max_fill_ratio = 0
         min_overlap_area = 100000000
-        for _ in range(100):
+        for _ in range(1000):
             nodes_rects = [Rectangle(node[0].item(), node[1].item(), 0) for node in nodes]
             # sampled_graph = sample_graph(adj.numpy())
             sampled_graph = adj.numpy()
@@ -548,19 +548,19 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # "train" or "test"
-    mode = "test"
+    mode = "train"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_16"
+    model_dir_name = "model_19"
     # Size of the graph you want to train or test on
     data_graph_size = 10
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 5000
-    learning_rate_steps = [epochs // 3, epochs // 5 * 4]
+    epochs = 8000
+    learning_rate_steps = [epochs // 2, epochs // 5 * 4]
     batch_size = 1
     hidden_size_1 = 128
-    hidden_size_2 = 128
+    hidden_size_2 = 32
     num_layers = 4
     lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.40, "l1": 0.10}
     
@@ -598,7 +598,7 @@ if __name__ == "__main__":
             data_graph_size * 4,
             hidden_size_1,
             num_layers,
-            output_size=11,
+            output_size=hidden_size_2,
         ).to(device)
         rnn_edge = RNN(
             11,
