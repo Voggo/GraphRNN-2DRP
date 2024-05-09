@@ -259,6 +259,15 @@ def show_graph_with_labels(adjacency_matrix, mylabels):
     )
     plt.show()
 
+def sample_graph(adj: np.ndarray, nodes: np.ndarray, edge_dir: np.ndarray, offset: np.ndarray) -> np.ndarray:
+    new_adj = np.zeros(len(nodes), len(nodes))
+    for i in range(len(nodes)):
+        if sum(adj[i, :]) == 0:
+            new_adj[i, :] = adj[i, :]
+            continue
+        neighbours = np.where(adj[i, :] == 1)
+        for j in neighbours:
+            pass
 
 def bfs_index(adj, start):  # redundent just for testing
     """return the index of the nodes in bfs order"""

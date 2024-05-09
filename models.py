@@ -147,12 +147,12 @@ def train_rnn(
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            # y_pred_adj = y_pred[:, :, :num_nodes].clone()
-            # y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
+            y_pred_adj = y_pred[:, :, :num_nodes].clone()
+            y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
+            y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
+            y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
+            y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
+            y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -167,9 +167,9 @@ def train_rnn(
                 + lambda_ratios["l1"] * loss_l1
             )
             loss_sum += loss.item()
-            loss_sum_adj += loss_kl_adj.item() * lambda_ratios["kl_adj"]
-            loss_sum_dir += loss_kl_dir.item() * lambda_ratios["kl_dir"]
-            loss_sum_l1 += loss_l1.item() * lambda_ratios["l1"]
+            loss_sum_adj += loss_kl_adj.item()
+            loss_sum_dir += loss_kl_dir.item()
+            loss_sum_l1 += loss_l1.item()
             loss.backward()
             optimizer_rnn_graph.step()
             optimizer_rnn_edge.step()
@@ -182,7 +182,7 @@ def train_rnn(
         losses_mse.append(loss_sum_l1 / batches)
         if epoch % 5 == 0:
             print(
-                f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mse: {losses_mse[-1]}"
+                f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mae: {losses_mse[-1]}"
             )
         if epoch % 100 == 0 and not epoch == 0:
             torch.save(
@@ -299,12 +299,12 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            # y_pred_adj = y_pred[:, :, :num_nodes].clone()
-            # y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
-            # y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
+            y_pred_adj = y_pred[:, :, :num_nodes].clone()
+            y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
+            y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
+            y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
+            y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
+            y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -339,7 +339,7 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
             "losses": losses,
             "losses_bce_adj": losses_bce_adj,
             "losses_bce_dir": losses_bce_dir,
-            "losses_mse": losses_mae,
+            "losses_mae": losses_mae,
         }
         json.dump(
             losses,
@@ -393,7 +393,7 @@ def test_inference_rnn(
             rnn_edge.hidden[0, :, :] = output_graph[:, -1, :]
             edge_input_step = output_embed
             edge_y_pred = torch.zeros(batch_size, num_nodes, 9).to(device)
-            for j in range(i + 1):
+            for j in range(num_nodes):
                 _, output_edge = rnn_edge(edge_input_step)
                 output_edge[:, 0, 0:1] = torch.bernoulli(
                     F.sigmoid(output_edge[:, 0, 0:1])
@@ -423,17 +423,19 @@ def test_inference_rnn(
 
         adj = y_pred[0, :, :num_nodes].reshape(num_nodes, num_nodes).to(torch.int64)
         adj.diagonal().fill_(0)
-        adj = (adj + adj.T.to(torch.int64))
+        adj = torch.tril(adj) + torch.tril(adj).T
+        # adj = (adj + adj.T.to(torch.int64))
         edge_dir = y_pred[0, :, num_nodes : num_nodes * 6]
         edge_dir_splits = torch.split(edge_dir, edge_dir.size(1) // 5, dim=1)
         edge_dir = torch.stack(edge_dir_splits, dim=2)
         edge_dir = torch.argmax(edge_dir, dim=2)
         edge_dir.diagonal().fill_(0)
+        edge_dir = torch.tril(edge_dir)
         mapping = torch.tensor([0, 3, 4, 1, 2])
         edge_dir = (edge_dir + mapping[edge_dir].T).to(torch.int64)
         offset = y_pred[0, :, num_nodes * 6 :].reshape(num_nodes, num_nodes)
         offset.diagonal().fill_(0)
-        offset = offset + offset.T
+        offset = torch.tril(offset) + torch.tril(offset).T
         print("current adj:")
         print(adj)
         # Convert edge_dir to boolean tensor where True indicates the presence of an edge
@@ -443,9 +445,10 @@ def test_inference_rnn(
         best_rects = None
         max_fill_ratio = 0
         min_overlap_area = 100000000
-        for _ in range(1000):
+        for _ in range(10000):
             nodes_rects = [Rectangle(node[0].item(), node[1].item(), 0) for node in nodes]
             sampled_graph = sample_graph(adj.numpy())
+            # sampled_graph = adj.numpy()
             rects = convert_graph_to_rects(nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy())
             rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area = evaluate_solution(rects, 100, 100)
@@ -540,19 +543,19 @@ if __name__ == "__main__":
     # "train" or "test"
     mode = "train"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_14"
+    model_dir_name = "model_17"
     # Size of the graph you want to train or test on
     data_graph_size = 10
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 500
+    epochs = 6000
     learning_rate_steps = [epochs // 3, epochs // 5 * 4]
     batch_size = 1
     hidden_size_1 = 64
     hidden_size_2 = 64
     num_layers = 4
-    lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.48, "l1": 0.02}
+    lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.45, "l1": 0.05}
     
     sample_size = 0 # automatically set
 
