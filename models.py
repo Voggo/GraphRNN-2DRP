@@ -124,15 +124,15 @@ def train_rnn(
             ).to(device)
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0)).to(device)
             _, output_embed = rnn_graph(x)
-            y_pred = torch.zeros(x.size(0), num_nodes - 1, num_nodes * 7).to(device)
-            for i in range(num_nodes - 1):
+            y_pred = torch.zeros(x.size(0), num_nodes, num_nodes * 7).to(device)
+            for i in range(num_nodes):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0)).to(device)
                 rnn_edge.hidden[0, :, :] = output_embed[:, i, :].to(device)
                 edge_input = x_bumpy[:, :, :, i].transpose(-2, -1).to(device)
                 edge_input[:, 0, :] = torch.ones((batch_size, 1, 11)).to(device)
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
-                output_edge = output_edge[:, :, :]
+                output_edge = output_edge[:, :-1, :]
                 output_edge[:, :, 0:6] = F.sigmoid(output_edge[:, :, 0:6])
                 output_edge = torch.cat(
                     (
@@ -278,15 +278,15 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
             ).to(device)
             rnn_graph.hidden = rnn_graph.init_hidden(x.size(0)).to(device)
             _, output_embed = rnn_graph(x)
-            y_pred = torch.zeros(x.size(0), num_nodes - 1, num_nodes * 7).to(device)
-            for i in range(num_nodes - 1):
+            y_pred = torch.zeros(x.size(0), num_nodes, num_nodes * 7).to(device)
+            for i in range(num_nodes):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0)).to(device)
                 rnn_edge.hidden[0, :, :] = output_embed[:, i, :].to(device)
                 edge_input = x_bumpy[:, :, :, i].transpose(-2, -1).to(device)
                 edge_input[:, 0, :] = torch.ones((batch_size, 1, 11)).to(device)
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
-                output_edge = output_edge[:, :, :]
+                output_edge = output_edge[:, :-1, :]
                 output_edge[:, :, 0:6] = F.sigmoid(output_edge[:, :, 0:6])
                 output_edge = torch.cat(
                     (
