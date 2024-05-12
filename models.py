@@ -28,7 +28,7 @@ class RNN(torch.nn.Module):
         super(RNN, self).__init__()
 
         self.num_layers = num_layers
-        
+
         self.embedding = torch.nn.Linear(input_size, embedding_size)
         self.relu = torch.nn.ReLU()
         self.rnn = torch.nn.GRU(
@@ -129,7 +129,6 @@ def train_rnn(
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0)).to(device)
                 rnn_edge.hidden[0, :, :] = output_embed[:, i, :].to(device)
                 edge_input = x_bumpy[:, :, :, i].transpose(-2, -1).to(device)
-                edge_input[:, 0, :] = torch.ones((batch_size, 1, 11)).to(device)
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
                 output_edge = output_edge[:, :, :]
@@ -153,7 +152,7 @@ def train_rnn(
             y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
             y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
-            y_pred[:, :, num_nodes : num_nodes * 2] *= y_pred_adj
+            y_pred[:, :, num_nodes : num_nodes * 2] *=  torch.tril(1 - y_pred_adj)
             y_pred[:, :, :num_nodes] = y_pred_adj
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
@@ -283,7 +282,7 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                 rnn_edge.hidden = rnn_edge.init_hidden(x.size(0)).to(device)
                 rnn_edge.hidden[0, :, :] = output_embed[:, i, :].to(device)
                 edge_input = x_bumpy[:, :, :, i].transpose(-2, -1).to(device)
-                edge_input[:, 0, :] = torch.ones((batch_size, 1, 11)).to(device)
+                # edge_input[:, 0, :] = torch.ones((batch_size, 1, 7)).to(device)
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
                 output_edge = output_edge[:, :, :]
@@ -307,9 +306,9 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
             y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
             y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
-            y_pred[:, :, num_nodes : num_nodes * 2] *= y_pred_adj
-            
+            y_pred[:, :, num_nodes : num_nodes * 2] *= torch.tril(1 - y_pred_adj)
             y_pred[:, :, :num_nodes] = y_pred_adj
+
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -317,20 +316,65 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
                 y_pred[:, :, num_nodes : num_nodes * 6],
                 y[:, :, num_nodes : num_nodes * 6],
             )
-            loss_l1 = F.l1_loss(
-                y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :]
-            )
-            loss = (
-                loss_kl_adj
-                + loss_kl_dir
-                + loss_l1
-            )
+            loss_l1 = F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :])
+            loss = loss_kl_adj + loss_kl_dir + loss_l1
             losses.append(loss.item())
             losses_bce_adj.append(loss_kl_adj.item())
             losses_bce_dir.append(loss_kl_dir.item())
             losses_mae.append(loss_l1.item())
             print(
                 f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mae: {loss_l1.item()}"
+            )
+            y_pred = torch.round(y_pred)
+            # number of cells predicted is only lower triangle
+            cells = 0.5 * (num_nodes - 1) * num_nodes
+            accuracy_adj = (
+                torch.sum(y_pred[:, :, :num_nodes] == y[:, :, :num_nodes]) - cells
+            ) / cells
+            accuracy_dir_0 = (
+                torch.sum(
+                    y_pred[:, :, num_nodes : num_nodes * 2]
+                    == y[:, :, num_nodes : num_nodes * 2]
+                )
+                - cells
+            ) / cells
+            accuracy_dir_1 = (
+                torch.sum(
+                    y_pred[:, :, num_nodes * 2 : num_nodes * 3]
+                    == y[:, :, num_nodes * 2 : num_nodes * 3]
+                )
+                - cells
+            ) / cells
+            accuracy_dir_2 = (
+                torch.sum(
+                    y_pred[:, :, num_nodes * 3 : num_nodes * 4]
+                    == y[:, :, num_nodes * 3 : num_nodes * 4]
+                )
+                - cells
+            ) / cells
+            accuracy_dir_3 = (
+                torch.sum(
+                    y_pred[:, :, num_nodes * 4 : num_nodes * 5]
+                    == y[:, :, num_nodes * 4 : num_nodes * 5]
+                )
+                - cells
+            ) / cells
+            accuracy_dir_4 = (
+                torch.sum(
+                    y_pred[:, :, num_nodes * 5 : num_nodes * 6]
+                    == y[:, :, num_nodes * 5 : num_nodes * 6]
+                )
+                - cells
+            ) / cells
+            accuracy_dir = (
+                accuracy_dir_0
+                + accuracy_dir_1
+                + accuracy_dir_2
+                + accuracy_dir_3
+                + accuracy_dir_4
+            ) / 5
+            print(
+                f"accuracy adj: {accuracy_adj}, accuracy dir_0: {accuracy_dir_0}, accuracy dir_1: {accuracy_dir_1}, accuracy dir_2: {accuracy_dir_2}, accuracy dir_3: {accuracy_dir_3}, accuracy dir_4: {accuracy_dir_4}, accuracy dir: {accuracy_dir}"
             )
         losses_mean = sum(losses) / len(losses)
         losses_bce_adj_mean = sum(losses_bce_adj) / len(losses_bce_adj)
@@ -366,11 +410,13 @@ def test_inference_rnn(
     batch_size=1,
 ):
     rnn_graph = RNN(
-        num_nodes * 9, num_nodes * 4, hidden_size_1, num_layers, output_size=hidden_size_2
+        num_nodes * 9,
+        num_nodes * 4,
+        hidden_size_1,
+        num_layers,
+        output_size=hidden_size_2,
     ).to(device)
-    rnn_edge = RNN(11, 16, hidden_size_2, num_layers, output_size=7).to(
-        device
-    )
+    rnn_edge = RNN(11, 16, hidden_size_2, num_layers, output_size=7).to(device)
     rnn_graph.load_state_dict(
         torch.load(
             f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth",
@@ -390,15 +436,22 @@ def test_inference_rnn(
         print(data.data_bfs_edge_dir[graph])
         print(data.data_bfs_offset[graph])
         nodes = torch.tensor(data.data_bfs_nodes[graph]).to(device)
-        x_step = torch.ones(batch_size, 1, num_nodes * 9).to(device)
-        x_step_all = torch.zeros(batch_size, num_nodes + 1, num_nodes * 9).to(device)
+        x_step = torch.ones(batch_size, 1, num_nodes * 9).to(device) 
+        x_step[:, 0, 7 * num_nodes:] = torch.zeros(batch_size, 1, 2 * num_nodes).to(device)
+        x_step[:, 0, 7 * num_nodes] = nodes[0][0]
+        x_step[:, 0, 8 * num_nodes] = nodes[0][1]
+        x_step_all = torch.zeros(batch_size, num_nodes, num_nodes * 9).to(device) # debugging
         x_step_all[:, 0, :] = x_step
-        y_pred = torch.zeros(batch_size, num_nodes, num_nodes * 7).to(device)
-        for i in range(num_nodes):
-            output_graph, output_embed = rnn_graph(x_step)
+        y_pred = torch.zeros(batch_size, num_nodes - 1, num_nodes * 7).to(device)
+        for i in range(num_nodes - 1):
+            _ , output_embed = rnn_graph(x_step)
             rnn_edge.hidden = rnn_edge.init_hidden(batch_size).to(device)
             rnn_edge.hidden[0, :, :] = output_embed[:, -1, :]
             edge_input_step = torch.ones(batch_size, 1, 11).to(device)
+            edge_input_step[:, 0, 7] = nodes[0][0]
+            edge_input_step[:, 0, 8] = nodes[0][1]
+            edge_input_step[:, 0, 9] = nodes[i][0]
+            edge_input_step[:, 0, 10] = nodes[i][1]
             edge_y_pred = torch.zeros(batch_size, num_nodes, 9).to(device)
             for j in range(i + 1):
                 _, output_edge = rnn_edge(edge_input_step)
@@ -409,30 +462,32 @@ def test_inference_rnn(
                 output_edge[:, 0, 1 + dir] = 1
                 output_edge[:, 0, 1 : dir + 1] = 0
                 output_edge[:, 0, dir + 2 : 6] = 0
+                output_edge[:, 0, 0:] *= output_edge[:, 0, 0:1].clone()
                 edge_input_step[:, :, :7] = output_edge[0, 0, :]
-                if j < len(nodes):
-                    edge_input_step[:, 0, 7] = nodes[j][0]
-                    edge_input_step[:, 0, 8] = nodes[j][1]
+                if j < len(nodes) - 1:
+                    edge_input_step[:, 0, 7] = nodes[j + 1][0]
+                    edge_input_step[:, 0, 8] = nodes[j + 1][1]
                 else:
                     edge_input_step[:, 0, 7] = 0
                     edge_input_step[:, 0, 8] = 0
-                if i < len(nodes):
-                    edge_input_step[:, 0, 9] = nodes[i][0]
-                    edge_input_step[:, 0, 10] = nodes[i][1]
+                if i < len(nodes) - 1:
+                    edge_input_step[:, 0, 9] = nodes[i + 1][0]
+                    edge_input_step[:, 0, 10] = nodes[i + 1][1]
                 else:
                     edge_input_step[:, 0, 9] = 0
                     edge_input_step[:, 0, 10] = 0
                 edge_y_pred[:, j, :7] = output_edge[:, :, :7]
-                edge_y_pred[:, j, 7:] = edge_input_step[:, :, 7:9]
+                edge_y_pred[:, j + 1, 7:] = edge_input_step[:, :, 7:9]
             edge_y_pred = edge_y_pred.transpose(-2, -1).flatten(start_dim=1, end_dim=2)
             y_pred[:, i, :] = edge_y_pred[:, : num_nodes * 7]
             x_step = edge_y_pred.unsqueeze(0).to(device)
+            x_step[:, :, 7 * num_nodes] = nodes[0][0]
+            x_step[:, :, 8 * num_nodes] = nodes[0][1]
             x_step_all[:, i + 1, :] = x_step
-        y_pred = y_pred[:, :-1, :]
         y_pred = torch.cat((torch.zeros((1, 1, num_nodes * 7)), y_pred), dim=1)
         adj = y_pred[0, :, :num_nodes].reshape(num_nodes, num_nodes).to(torch.int64)
         adj.diagonal().fill_(0)
-        adj = (adj + adj.T.to(torch.int64))
+        adj = adj + adj.T.to(torch.int64)
         edge_dir = y_pred[0, :, num_nodes : num_nodes * 6]
         edge_dir_splits = torch.split(edge_dir, edge_dir.size(1) // 5, dim=1)
         edge_dir = torch.stack(edge_dir_splits, dim=2)
@@ -457,10 +512,14 @@ def test_inference_rnn(
         max_fill_ratio = 0
         min_overlap_area = 100000000
         for _ in range(1000):
-            nodes_rects = [Rectangle(node[0].item(), node[1].item(), 0) for node in nodes]
+            nodes_rects = [
+                Rectangle(node[0].item(), node[1].item(), 0) for node in nodes
+            ]
             sampled_graph = sample_graph(adj.numpy())
             # sampled_graph = adj.numpy()
-            rects = convert_graph_to_rects(nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy())
+            rects = convert_graph_to_rects(
+                nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy()
+            )
             rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area = evaluate_solution(rects, 100, 100)
             if fill_ratio > max_fill_ratio:
@@ -514,8 +573,12 @@ def train(
     print(f"max nodes: {num_nodes}")
     override = False
     if (
-        os.path.isfile(f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth")
-        or os.path.isfile(f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth")
+        os.path.isfile(
+            f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth"
+        )
+        or os.path.isfile(
+            f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth"
+        )
         or override
     ):
         input("Models already exist. Press enter to continue")
@@ -554,21 +617,21 @@ if __name__ == "__main__":
     # "train" or "test"
     mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_22"
+    model_dir_name = "model_25"
     # Size of the graph you want to train or test on
     data_graph_size = 6
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 10000
+    epochs = 6000
     learning_rate_steps = [epochs // 2, epochs // 5 * 4]
     batch_size = 1
-    hidden_size_1 = 256
-    hidden_size_2 = 128
+    hidden_size_1 = 64
+    hidden_size_2 = 16
     num_layers = 5
     lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.40, "l1": 0.10}
-    
-    sample_size = 0 # automatically set
+
+    sample_size = 0  # automatically set
 
     if mode == "test":
         dataset = Dataset(data_graph_size, test=False)
