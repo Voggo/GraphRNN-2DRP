@@ -132,7 +132,7 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    generate_datasets(1, 100, 100, test=False)
+    generate_datasets(250, 100, 100, test=False)
     data = Dataset(6, test=False)
     x = data[0]["x"]
     print(x)
