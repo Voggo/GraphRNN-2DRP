@@ -84,8 +84,11 @@ def evaluate_solution(rects: List[Rectangle], target_width: int, target_height: 
         x_max_y_min_target,
     ]
     target_area_fill = 0
+    cutoff_area = 0
     for target in target_rects:
-        target_area_fill = max(target_area_fill, intersection(target, union_rects).area)
+        if intersection(target, union_rects).area > target_area_fill:
+            target_area_fill = intersection(target, union_rects).area
+            cutoff_area = union_rects.area - target_area_fill
     fill_ratio = target_area_fill / (target_width * target_height)
     overlap_area = get_overlap_area(shapely_rects)
-    return fill_ratio, overlap_area
+    return fill_ratio, overlap_area, cutoff_area

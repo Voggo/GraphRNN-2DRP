@@ -558,6 +558,7 @@ def test_inference_rnn(
         best_rects = None
         max_fill_ratio = 0
         min_overlap_area = 100000000
+        max_utility = 0
         for _ in range(1000):
             nodes_rects = [
                 Rectangle(node[0].item(), node[1].item(), 0) for node in nodes
@@ -568,14 +569,16 @@ def test_inference_rnn(
                 nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy()
             )
             rects = convert_center_to_lower_left(rects)
-            fill_ratio, overlap_area = evaluate_solution(rects, 100, 100)
-            if fill_ratio > max_fill_ratio:
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+            utility = fill_ratio -  0.1 * overlap_area/10000 - 0.1 * cutoff_area/10000
+            print(f"utility: {utility}")
+            if utility > max_utility:
                 max_fill_ratio = fill_ratio
-                best_rects = rects
                 min_overlap_area = overlap_area
-                # best_rects = rects
+                best_rects = rects
         print(f"max fill ratio: {max_fill_ratio}")
         print(f"min overlap area: {min_overlap_area}")
+        print(f"cut off area: {cutoff_area}")
         plot_rects(
             best_rects,
             ax_lim=100,
@@ -681,7 +684,7 @@ if __name__ == "__main__":
     sample_size = 0  # automatically set
 
     if mode == "test":
-        dataset = Dataset(data_graph_size, test=True)
+        dataset = Dataset(data_graph_size, test=False)
         data = torch.utils.data.DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
