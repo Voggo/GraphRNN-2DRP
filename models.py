@@ -9,7 +9,7 @@ from data import Dataset
 from plot_rects import plot_rects
 from generator import convert_graph_to_rects
 from dataclasses_rect_point import Rectangle, Point
-from utils import convert_center_to_lower_left, sample_graph
+from utils import sample_graph, accuracy
 from eval_solutions import evaluate_solution
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -78,12 +78,16 @@ def train_rnn(
     scheduler_rnn_edge = torch.optim.lr_scheduler.MultiStepLR(
         optimizer_rnn_edge, learning_rate_steps, gamma=0.2
     )
+    test_dataset = Dataset(num_nodes, test=True)
+    test_data = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
     rnn_graph.train()
     rnn_edge.train()
     losses = []
     losses_bce_adj = []
     losses_bce_dir = []
     losses_mae = []
+    test_mean_loss = []
+    test_mean_accuracy = []
     for epoch in range(epochs):
         loss_sum = 0
         loss_sum_adj = 0
@@ -173,14 +177,21 @@ def train_rnn(
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             y_pred[:, :, num_nodes : num_nodes * 2] *= torch.tril(1 - y_pred_adj)
             y_pred[:, :, :num_nodes] = y_pred_adj
-            loss_kl_adj = F.binary_cross_entropy(
-                y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
+            loss_kl_adj = (
+                F.binary_cross_entropy(y_pred[:, :, :num_nodes], y[:, :, :num_nodes])
+                / batch_size
             )
-            loss_kl_dir = F.binary_cross_entropy(
-                y_pred[:, :, num_nodes : num_nodes * 6],
-                y[:, :, num_nodes : num_nodes * 6],
+            loss_kl_dir = (
+                F.binary_cross_entropy(
+                    y_pred[:, :, num_nodes : num_nodes * 6],
+                    y[:, :, num_nodes : num_nodes * 6],
+                )
+                / batch_size
             )
-            loss_l1 = F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :])
+            loss_l1 = (
+                F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :])
+                / batch_size
+            )
             loss = (
                 lambda_ratios["kl_adj"] * loss_kl_adj
                 + lambda_ratios["kl_dir"] * loss_kl_dir
@@ -204,7 +215,7 @@ def train_rnn(
             print(
                 f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mae: {losses_mae[-1]}"
             )
-        if epoch % 100 == 0 and not epoch == 0:
+        if (epoch + 1) % 100 == 0 and not epoch == 0:
             torch.save(
                 rnn_graph.state_dict(),
                 f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth",
@@ -213,6 +224,9 @@ def train_rnn(
                 rnn_edge.state_dict(),
                 f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth",
             )
+            metrics = test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data)
+            test_mean_accuracy.append(metrics["test_mean_accuracy"])
+            test_mean_loss.append(metrics["test_mean_loss"])
 
     torch.save(
         rnn_graph.state_dict(),
@@ -222,49 +236,36 @@ def train_rnn(
         rnn_edge.state_dict(),
         f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth",
     )
-    return rnn_graph, rnn_edge, losses, losses_bce_adj, losses_bce_dir, losses_mae
+    return (
+        rnn_graph,
+        rnn_edge,
+        losses,
+        losses_bce_adj,
+        losses_bce_dir,
+        losses_mae,
+        test_mean_loss,
+        test_mean_accuracy,
+    )
 
 
-def test_rnn(device, num_nodes, model_dir_name, test_data):
-    hp = {}
-    with open(
-        f"models/{model_dir_name}_graph_size_{num_nodes}/hyperparameters.json", "r"
-    ) as f:
-        hp = json.load(f)
-    rnn_graph = RNN(
-        9 * num_nodes,
-        4 * num_nodes,
-        hp["hidden_size_1"],
-        hp["num_layers"],
-        output_size=hp["hidden_size_2"],
-    ).to(device)
-    rnn_edge = RNN(
-        11,
-        16,
-        hp["hidden_size_2"],
-        hp["num_layers"],
-        output_size=7,
-    )
-    rnn_graph.load_state_dict(
-        torch.load(
-            f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth",
-            map_location=torch.device("cpu"),
-        )
-    )
-    rnn_edge.load_state_dict(
-        torch.load(
-            f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_edge_model.pth",
-            map_location=torch.device("cpu"),
-        )
-    )
+def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
     rnn_graph.eval()
     rnn_edge.eval()
+    batch_size = test_data.batch_size
     with torch.no_grad():
         # losses pr batch in the dataset
-        losses = []
-        losses_bce_adj = []
-        losses_bce_dir = []
-        losses_mae = []
+        metrics = {
+            "test_losses": {"loss": [], "bce_adj": [], "bce_dir": [], "mae": []},
+            "test_accuracies": {
+                "adj": [],
+                "dir_0": [],
+                "dir_1": [],
+                "dir_2": [],
+                "dir_3": [],
+                "dir_4": [],
+                "dir": [],
+            },
+        }
         for batch in test_data:
             x_bumpy = batch["x"].float().to(device)
             y_bumpy = batch["y"].float().to(device)
@@ -355,84 +356,48 @@ def test_rnn(device, num_nodes, model_dir_name, test_data):
             )
             loss_l1 = F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :])
             loss = loss_kl_adj + loss_kl_dir + loss_l1
-            losses.append(loss.item())
-            losses_bce_adj.append(loss_kl_adj.item())
-            losses_bce_dir.append(loss_kl_dir.item())
-            losses_mae.append(loss_l1.item())
+            metrics["test_losses"]["loss"].append(loss.item())
+            metrics["test_losses"]["bce_adj"].append(loss_kl_adj.item())
+            metrics["test_losses"]["bce_dir"].append(loss_kl_dir.item())
+            metrics["test_losses"]["mae"].append(loss_l1.item())
             print(
                 f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mae: {loss_l1.item()}"
             )
             y_pred = torch.round(y_pred)
             # number of cells predicted is only lower triangle
-            cells = 0.5 * (num_nodes - 1) * num_nodes
-            accuracy_adj = (
-                torch.sum(y_pred[:, :, :num_nodes] == y[:, :, :num_nodes]) - cells
-            ) / cells
-            accuracy_dir_0 = (
-                torch.sum(
-                    y_pred[:, :, num_nodes : num_nodes * 2]
-                    == y[:, :, num_nodes : num_nodes * 2]
-                )
-                - cells
-            ) / cells
-            accuracy_dir_1 = (
-                torch.sum(
-                    y_pred[:, :, num_nodes * 2 : num_nodes * 3]
-                    == y[:, :, num_nodes * 2 : num_nodes * 3]
-                )
-                - cells
-            ) / cells
-            accuracy_dir_2 = (
-                torch.sum(
-                    y_pred[:, :, num_nodes * 3 : num_nodes * 4]
-                    == y[:, :, num_nodes * 3 : num_nodes * 4]
-                )
-                - cells
-            ) / cells
-            accuracy_dir_3 = (
-                torch.sum(
-                    y_pred[:, :, num_nodes * 4 : num_nodes * 5]
-                    == y[:, :, num_nodes * 4 : num_nodes * 5]
-                )
-                - cells
-            ) / cells
-            accuracy_dir_4 = (
-                torch.sum(
-                    y_pred[:, :, num_nodes * 5 : num_nodes * 6]
-                    == y[:, :, num_nodes * 5 : num_nodes * 6]
-                )
-                - cells
-            ) / cells
-            accuracy_dir = (
-                accuracy_dir_0
-                + accuracy_dir_1
-                + accuracy_dir_2
-                + accuracy_dir_3
-                + accuracy_dir_4
-            ) / 5
+            cells = 0.5 * (num_nodes - 1) * num_nodes * batch_size
+            accuracies = accuracy(y_pred, y, cells, num_nodes)
+            metrics["test_accuracies"]["adj"].append(accuracies["accuracy_adj"])
+            metrics["test_accuracies"]["dir_0"].append(accuracies["accuracy_dir_0"])
+            metrics["test_accuracies"]["dir_1"].append(accuracies["accuracy_dir_1"])
+            metrics["test_accuracies"]["dir_2"].append(accuracies["accuracy_dir_2"])
+            metrics["test_accuracies"]["dir_3"].append(accuracies["accuracy_dir_3"])
+            metrics["test_accuracies"]["dir_4"].append(accuracies["accuracy_dir_4"])
+            metrics["test_accuracies"]["dir"].append(accuracies["accuracy_dir"])
             print(
-                f"accuracy adj: {accuracy_adj}, accuracy dir_0: {accuracy_dir_0}, accuracy dir_1: {accuracy_dir_1}, accuracy dir_2: {accuracy_dir_2}, accuracy dir_3: {accuracy_dir_3}, accuracy dir_4: {accuracy_dir_4}, accuracy dir: {accuracy_dir}"
+                f"accuracy adj: {accuracies['accuracy_adj']}, accuracy dir_0: {accuracies['accuracy_dir_0']}, accuracy dir_1: {accuracies['accuracy_dir_1']}, accuracy dir_2: {accuracies['accuracy_dir_2']}, accuracy dir_3: {accuracies['accuracy_dir_3']}, accuracy dir_4: {accuracies['accuracy_dir_4']}, accuracy dir: {accuracies['accuracy_dir']}"
             )
-        losses_mean = sum(losses) / len(losses)
-        losses_bce_adj_mean = sum(losses_bce_adj) / len(losses_bce_adj)
-        losses_bce_dir_mean = sum(losses_bce_dir) / len(losses_bce_dir)
-        losses_mse_mean = sum(losses_mae) / len(losses_mae)
-        print(
-            f"mean loss: {losses_mean}",
-            f"mean bce adj: {losses_bce_adj_mean}, mean bce dir: {losses_bce_dir_mean}, mean mae: {losses_mse_mean}",
-        )
-        losses = {
-            "losses": losses,
-            "losses_bce_adj": losses_bce_adj,
-            "losses_bce_dir": losses_bce_dir,
-            "losses_mae": losses_mae,
+        losses = metrics["test_losses"]
+        metrics["test_mean_loss"] = {
+            "loss_mean": sum(losses["loss"]) / len(losses["loss"]),
+            "loss_bce_adj_mean": sum(losses["bce_adj"]) / len(losses["bce_adj"]),
+            "loss_bce_dir_mean": sum(losses["bce_dir"]) / len(losses["bce_dir"]),
+            "loss_mse_mean": sum(losses["mae"]) / len(losses["mae"]),
         }
-        json.dump(
-            losses,
-            open(
-                f"models/{model_dir_name}_graph_size_{num_nodes}/test_losses.json", "w"
-            ),
+        accuracies = metrics["test_accuracies"]
+        metrics["test_mean_accuracy"] = {
+            "accuracy_adj": sum(accuracies["adj"]) / len(accuracies["adj"]),
+            "accuracy_dir_0": sum(accuracies["dir_0"]) / len(accuracies["dir_0"]),
+            "accuracy_dir_1": sum(accuracies["dir_1"]) / len(accuracies["dir_1"]),
+            "accuracy_dir_2": sum(accuracies["dir_2"]) / len(accuracies["dir_2"]),
+            "accuracy_dir_3": sum(accuracies["dir_3"]) / len(accuracies["dir_3"]),
+            "accuracy_dir_4": sum(accuracies["dir_4"]) / len(accuracies["dir_4"]),
+            "accuracy_dir": sum(accuracies["dir"]) / len(accuracies["dir"]),
+        }
+        print(
+            f"mean loss: {metrics['test_mean_loss']['loss_mean']}, mean bce adj: {metrics['test_mean_loss']['loss_bce_adj_mean']}, mean bce dir: {metrics['test_mean_loss']['loss_bce_dir_mean']}, mean mae: {metrics['test_mean_loss']['loss_mse_mean']}"
         )
+        return metrics
 
 
 def test_inference_rnn(
@@ -568,10 +533,12 @@ def test_inference_rnn(
             rects = convert_graph_to_rects(
                 nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy()
             )
-            rects = convert_center_to_lower_left(rects)
+            # rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
-            utility = fill_ratio -  0.1 * overlap_area/10000 - 0.1 * cutoff_area/10000
-            print(f"utility: {utility}")
+            utility = (
+                fill_ratio - 0.1 * overlap_area / 10000 - 0.1 * cutoff_area / 10000
+            )
+            # print(f"utility: {utility}")
             if utility > max_utility:
                 max_fill_ratio = fill_ratio
                 min_overlap_area = overlap_area
@@ -602,7 +569,7 @@ def plot_losses(
     axs[1, 0].plot(losses_bce_dir, color="blue")
     axs[1, 0].set_title("BCE Dir Loss", fontsize=10)
     axs[1, 1].plot(losses_mse, color="orange")
-    axs[1, 1].set_title("MSE Loss", fontsize=10)
+    axs[1, 1].set_title("MAE Loss", fontsize=10)
     fig.subplots_adjust(hspace=0.3, wspace=0.3)
     plt.savefig(f"models/{model_dir_name}_graph_size_{num_nodes}/losses.png")
     plt.show()
@@ -632,7 +599,16 @@ def train(
         or override
     ):
         input("Models already exist. Press enter to continue")
-    rnn_graph, rnn_edge, losses, losses_bce_adj, losses_bce_dir, losses_mse = train_rnn(
+    (
+        rnn_graph,
+        rnn_edge,
+        losses,
+        losses_bce_adj,
+        losses_bce_dir,
+        losses_mse,
+        test_mean_loss,
+        test_mean_accuracy,
+    ) = train_rnn(
         rnn_graph,
         rnn_edge,
         device,
@@ -657,6 +633,14 @@ def train(
         losses,
         open(f"models/{model_dir_name}_graph_size_{num_nodes}/losses.json", "w"),
     )
+    test_metrics = {
+        "test_mean_loss": test_mean_loss,
+        "test_mean_accuracy": test_mean_accuracy,
+    }
+    json.dump(
+        test_metrics,
+        open(f"models/{model_dir_name}_graph_size_{num_nodes}/test_metrics.json", "w"),
+    )
 
 
 if __name__ == "__main__":
@@ -667,7 +651,7 @@ if __name__ == "__main__":
     # "train" or "test"
     mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_27"
+    model_dir_name = "model_29"
     # Size of the graph you want to train or test on
     data_graph_size = 10
 
@@ -675,7 +659,7 @@ if __name__ == "__main__":
     learning_rate = 0.001
     epochs = 2000
     learning_rate_steps = [epochs // 2, epochs // 5 * 4]
-    batch_size = 10
+    batch_size = 1
     hidden_size_1 = 64
     hidden_size_2 = 16
     num_layers = 4
@@ -688,7 +672,39 @@ if __name__ == "__main__":
         data = torch.utils.data.DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=0
         )
-        test_rnn(device, data_graph_size, model_dir_name, data)
+        hp = {}
+        with open(
+            f"models/{model_dir_name}_graph_size_{data_graph_size}/hyperparameters.json",
+            "r",
+        ) as f:
+            hp = json.load(f)
+        rnn_graph = RNN(
+            9 * data_graph_size,
+            4 * data_graph_size,
+            hp["hidden_size_1"],
+            hp["num_layers"],
+            output_size=hp["hidden_size_2"],
+        ).to(device)
+        rnn_edge = RNN(
+            11,
+            16,
+            hp["hidden_size_2"],
+            hp["num_layers"],
+            output_size=7,
+        )
+        rnn_graph.load_state_dict(
+            torch.load(
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/rnn_graph_model.pth",
+                map_location=torch.device("cpu"),
+            )
+        )
+        rnn_edge.load_state_dict(
+            torch.load(
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/rnn_edge_model.pth",
+                map_location=torch.device("cpu"),
+            )
+        )
+        # test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
         for i in range(len(dataset)):
             test_inference_rnn(
                 device,
@@ -700,6 +716,13 @@ if __name__ == "__main__":
                 model_dir_name,
                 dataset,
             )
+        json.dump(
+            test_metrics,
+            open(
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_metrics.json",
+                "w",
+            ),
+        )
     if mode == "train":
         if not os.path.exists(f"models/{model_dir_name}_graph_size_{data_graph_size}"):
             os.mkdir(f"models/{model_dir_name}_graph_size_{data_graph_size}")

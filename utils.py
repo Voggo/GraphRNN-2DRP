@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from typing import List
 import random
 import networkx as nx
@@ -59,7 +60,7 @@ def sample_graph(adj: np.ndarray) -> np.ndarray:
     n = adj.shape[0]
     visited = [False] * n
     for i in range(n):
-        if sum(adj[i,:]) == 0:
+        if sum(adj[i, :]) == 0:
             # print("Node", i, "has no neighbours")
             return adj
     visited[random.randint(0, n - 1)] = True
@@ -77,3 +78,71 @@ def sample_graph(adj: np.ndarray) -> np.ndarray:
         new_adj[start][next_node] = 1
         new_adj[next_node][start] = 1
     return new_adj
+
+
+# todo: change the accuracy function for directions
+def accuracy(y_pred, y, cells, num_nodes):
+    accuracy_adj = (
+        int(torch.sum(y_pred[:, :, :num_nodes] == y[:, :, :num_nodes])) - cells
+    ) / cells
+    accuracy_dir_0 = (
+        int(
+            torch.sum(
+                y_pred[:, :, num_nodes : num_nodes * 2]
+                == y[:, :, num_nodes : num_nodes * 2]
+            )
+        )
+        - cells
+    ) / cells
+    accuracy_dir_1 = (
+        int(
+            torch.sum(
+                y_pred[:, :, num_nodes * 2 : num_nodes * 3]
+                == y[:, :, num_nodes * 2 : num_nodes * 3]
+            )
+        )
+        - cells
+    ) / cells
+    accuracy_dir_2 = (
+        int(
+            torch.sum(
+                y_pred[:, :, num_nodes * 3 : num_nodes * 4]
+                == y[:, :, num_nodes * 3 : num_nodes * 4]
+            )
+        )
+        - cells
+    ) / cells
+    accuracy_dir_3 = (
+        int(
+            torch.sum(
+                y_pred[:, :, num_nodes * 4 : num_nodes * 5]
+                == y[:, :, num_nodes * 4 : num_nodes * 5]
+            )
+        )
+        - cells
+    ) / cells
+    accuracy_dir_4 = (
+        int(
+            torch.sum(
+                y_pred[:, :, num_nodes * 5 : num_nodes * 6]
+                == y[:, :, num_nodes * 5 : num_nodes * 6]
+            )
+        )
+        - cells
+    ) / cells
+    accuracy_dir = (
+        accuracy_dir_0
+        + accuracy_dir_1
+        + accuracy_dir_2
+        + accuracy_dir_3
+        + accuracy_dir_4
+    ) / 5
+    return {
+        "accuracy_adj": accuracy_adj,
+        "accuracy_dir_0": accuracy_dir_0,
+        "accuracy_dir_1": accuracy_dir_1,
+        "accuracy_dir_2": accuracy_dir_2,
+        "accuracy_dir_3": accuracy_dir_3,
+        "accuracy_dir_4": accuracy_dir_4,
+        "accuracy_dir": accuracy_dir,
+    }

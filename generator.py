@@ -1,5 +1,6 @@
 from typing import List
 import random
+import os
 import queue
 import copy
 import numpy as np
@@ -11,6 +12,7 @@ from dataclasses_rect_point import Rectangle, Point
 from utils import *
 from eval_solutions import evaluate_solution
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 # random.seed(4)
 
 
@@ -65,61 +67,54 @@ def reduce_rects(rects: np.ndarray, convergence_limit=100) -> List[Rectangle]:
         if x == x_compare and y == y_compare:
             continue
 
-        # Check if both rectangles are not None and there is no overlap
-        if (
-            rects[x, y] is not None
-            and rects[x_compare, y_compare] is not None
-            and not rectangles_overlap(rects[x, y], rects[x_compare, y_compare])
-        ):
-            # Merge the rectangles
-            if direction[0] > 0:
-                if (
-                    rects[x, y].height == rects[x_compare, y_compare].height
-                    and (rects[x, y].lower_left.x + rects[x, y].width)
-                    == rects[x_compare, y_compare].lower_left.x
-                    and rects[x, y].lower_left.y
-                    == rects[x_compare, y_compare].lower_left.y
-                ):
-                    index = np.where(rects == rects[x_compare, y_compare])
-                    rects[x, y].width += rects[x_compare, y_compare].width
-                    rects[index] = rects[x, y]
-                    convergence = 0
-            if direction[1] > 0:
-                if (
-                    rects[x, y].width == rects[x_compare, y_compare].width
-                    and (rects[x, y].lower_left.y + rects[x, y].height)
-                    == rects[x_compare, y_compare].lower_left.y
-                    and rects[x, y].lower_left.x
-                    == rects[x_compare, y_compare].lower_left.x
-                ):
-                    index = np.where(rects == rects[x_compare, y_compare])
-                    rects[x, y].height += rects[x_compare, y_compare].height
-                    rects[index] = rects[x, y]
-                    convergence = 0
-            if direction[0] < 0:
-                if (
-                    rects[x, y].height == rects[x_compare, y_compare].height
-                    and (rects[x_compare, y_compare].lower_left.x - rects[x, y].width)
-                    == rects[x, y].lower_left.x
-                    and rects[x, y].lower_left.y
-                    == rects[x_compare, y_compare].lower_left.y
-                ):
-                    index = np.where(rects == rects[x, y])
-                    rects[x_compare, y_compare].width += rects[x, y].width
-                    rects[index] = rects[x_compare, y_compare]
-                    convergence = 0
-            if direction[1] < 0:
-                if (
-                    rects[x, y].width == rects[x_compare, y_compare].width
-                    and rects[x_compare, y_compare].lower_left.y - rects[x, y].height
-                    == rects[x, y].lower_left.y
-                    and rects[x, y].lower_left.x
-                    == rects[x_compare, y_compare].lower_left.x
-                ):
-                    index = np.where(rects == rects[x, y])
-                    rects[x_compare, y_compare].height += rects[x, y].height
-                    rects[index] = rects[x_compare, y_compare]
-                    convergence = 0
+        if direction[0] > 0:
+            if (
+                rects[x, y].height == rects[x_compare, y_compare].height
+                and (rects[x, y].lower_left.x + rects[x, y].width)
+                == rects[x_compare, y_compare].lower_left.x
+                and rects[x, y].lower_left.y
+                == rects[x_compare, y_compare].lower_left.y
+            ):
+                index = np.where(rects == rects[x_compare, y_compare])
+                rects[x, y].width += rects[x_compare, y_compare].width
+                rects[index] = rects[x, y]
+                convergence = 0
+        if direction[1] > 0:
+            if (
+                rects[x, y].width == rects[x_compare, y_compare].width
+                and (rects[x, y].lower_left.y + rects[x, y].height)
+                == rects[x_compare, y_compare].lower_left.y
+                and rects[x, y].lower_left.x
+                == rects[x_compare, y_compare].lower_left.x
+            ):
+                index = np.where(rects == rects[x_compare, y_compare])
+                rects[x, y].height += rects[x_compare, y_compare].height
+                rects[index] = rects[x, y]
+                convergence = 0
+        if direction[0] < 0:
+            if (
+                rects[x, y].height == rects[x_compare, y_compare].height
+                and (rects[x_compare, y_compare].lower_left.x - rects[x, y].width)
+                == rects[x, y].lower_left.x
+                and rects[x, y].lower_left.y
+                == rects[x_compare, y_compare].lower_left.y
+            ):
+                index = np.where(rects == rects[x, y])
+                rects[x_compare, y_compare].width += rects[x, y].width
+                rects[index] = rects[x_compare, y_compare]
+                convergence = 0
+        if direction[1] < 0:
+            if (
+                rects[x, y].width == rects[x_compare, y_compare].width
+                and rects[x_compare, y_compare].lower_left.y - rects[x, y].height
+                == rects[x, y].lower_left.y
+                and rects[x, y].lower_left.x
+                == rects[x_compare, y_compare].lower_left.x
+            ):
+                index = np.where(rects == rects[x, y])
+                rects[x_compare, y_compare].height += rects[x, y].height
+                rects[index] = rects[x_compare, y_compare]
+                convergence = 0
 
         convergence += 1
         if convergence > convergence_limit:
@@ -195,7 +190,6 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
     q = queue.Queue()
     nodes[queue_index].lower_left = Point(0, 0)
     q.put(edge_index[0][0])
-    count = 0
     while not q.empty():
         node_from = q.get()
         visited[node_from] = True
@@ -204,7 +198,6 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
         for node_to in neighbours:
             if visited[node_to] or nodes[node_to].lower_left is not None:
                 continue
-            count += 1
             q.put(node_to)
             if edge_dir[node_from, node_to] == 2:
                 y_offset = offset[node_from, node_to]
@@ -232,6 +225,7 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
                 )
             else:
                 raise ValueError("Invalid edge direction")
+    nodes = convert_center_to_lower_left(nodes)
     return nodes
 
 
@@ -295,7 +289,7 @@ if __name__ == "__main__":
     # show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
 
     rects_again = convert_graph_to_rects(bfs_nodes, bfs_adj, bfs_edge_dir, bfs_offset)
-    rects_again = convert_center_to_lower_left(rects_again)
+    # rects_again = convert_center_to_lower_left(rects_again)
     print(evaluate_solution(rects_again, 50, 50))
     plot_rects(
         rects_again,
