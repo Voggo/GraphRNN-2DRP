@@ -131,7 +131,7 @@ def convert_rects_to_graph(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Convert a list of Rectangles to a graph."""
     adjacency_matrix = np.zeros((len(rects), len(rects)), dtype=int)
-    edge_directions = np.zeros((len(rects), len(rects)), dtype=int)
+    edge_directions = np.zeros((len(rects), len(rects)), dtype=int) - 1
     offset = np.zeros((len(rects), len(rects)), dtype=float)
     for i, rect1_enum in enumerate(rects):
         for j, rect2_enum in enumerate(rects):
@@ -152,8 +152,8 @@ def convert_rects_to_graph(
                     rect1, rect2 = copy.copy(rect2), copy.copy(rect1)
                 adjacency_matrix[index_i, index_j] = 1
                 adjacency_matrix[index_j, index_i] = 1
-                edge_directions[index_i, index_j] = 2  # 2 is right, 4 is left
-                edge_directions[index_j, index_i] = 4  # 4 is left, 2 is right
+                edge_directions[index_i, index_j] = 1  # 1 is right, 3 is left
+                edge_directions[index_j, index_i] = 3  # 3 is left, 1 is right
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
                 y_offset = rect2_center.y - rect1_center.y
@@ -172,8 +172,8 @@ def convert_rects_to_graph(
                     rect1, rect2 = copy.copy(rect2), copy.copy(rect1)
                 adjacency_matrix[index_i, index_j] = 1
                 adjacency_matrix[index_j, index_i] = 1
-                edge_directions[index_i, index_j] = 1  # 1 is up, 3 is down
-                edge_directions[index_j, index_i] = 3  # 3 is down, 1 is up
+                edge_directions[index_i, index_j] = 0  # 0 is up, 2 is down
+                edge_directions[index_j, index_i] = 2  # 2 is down, 0 is up
                 rect1_center = rect1.lower_left + center_offset(rect1)
                 rect2_center = rect2.lower_left + center_offset(rect2)
                 x_offset = rect2_center.x - rect1_center.x
@@ -199,32 +199,32 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
             if visited[node_to] or nodes[node_to].lower_left is not None:
                 continue
             q.put(node_to)
-            if edge_dir[node_from, node_to] == 2:
+            if edge_dir[node_from, node_to] == 1:
                 y_offset = offset[node_from, node_to]
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
-            elif edge_dir[node_from, node_to] == 4:
+            elif edge_dir[node_from, node_to] == 3:
                 y_offset = offset[node_from, node_to]
                 x_offset = (nodes[node_from].width + nodes[node_to].width) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -x_offset, -y_offset
                 )
-            elif edge_dir[node_from, node_to] == 1:
+            elif edge_dir[node_from, node_to] == 0:
                 x_offset = offset[node_from, node_to]
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     x_offset, y_offset
                 )
-            elif edge_dir[node_from, node_to] == 3:
+            elif edge_dir[node_from, node_to] == 2:
                 x_offset = offset[node_from, node_to]
                 y_offset = (nodes[node_from].height + nodes[node_to].height) / 2
                 nodes[node_to].lower_left = nodes[node_from].lower_left + Point(
                     -x_offset, -y_offset
                 )
             else:
-                raise ValueError("Invalid edge direction")
+                raise ValueError(f"Invalid edge direction: {edge_dir[node_from, node_to]}")
     nodes = convert_center_to_lower_left(nodes)
     return nodes
 

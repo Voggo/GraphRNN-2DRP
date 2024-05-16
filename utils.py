@@ -4,8 +4,6 @@ from typing import List
 import random
 import networkx as nx
 
-# from littleballoffur import LoopErasedRandomWalkSampler, NonBackTrackingRandomWalkSampler
-
 from dataclasses_rect_point import Rectangle, Point
 
 
@@ -85,61 +83,40 @@ def accuracy(y_pred, y, cells, num_nodes):
     accuracy_adj = (
         int(torch.sum(y_pred[:, :, :num_nodes] == y[:, :, :num_nodes])) - cells
     ) / cells
-    accuracy_dir_0 = (
-        int(
-            torch.sum(
-                y_pred[:, :, num_nodes : num_nodes * 2]
-                == y[:, :, num_nodes : num_nodes * 2]
-            )
-        )
-        - cells
-    ) / cells
-    accuracy_dir_1 = (
-        int(
-            torch.sum(
-                y_pred[:, :, num_nodes * 2 : num_nodes * 3]
-                == y[:, :, num_nodes * 2 : num_nodes * 3]
-            )
-        )
-        - cells
-    ) / cells
-    accuracy_dir_2 = (
-        int(
-            torch.sum(
-                y_pred[:, :, num_nodes * 3 : num_nodes * 4]
-                == y[:, :, num_nodes * 3 : num_nodes * 4]
-            )
-        )
-        - cells
-    ) / cells
-    accuracy_dir_3 = (
-        int(
-            torch.sum(
-                y_pred[:, :, num_nodes * 4 : num_nodes * 5]
-                == y[:, :, num_nodes * 4 : num_nodes * 5]
-            )
-        )
-        - cells
-    ) / cells
-    accuracy_dir_4 = (
-        int(
-            torch.sum(
-                y_pred[:, :, num_nodes * 5 : num_nodes * 6]
-                == y[:, :, num_nodes * 5 : num_nodes * 6]
-            )
-        )
-        - cells
-    ) / cells
+
+    dir_1_pred = y_pred[:, :, num_nodes : num_nodes * 2]
+    dir_2_pred = y_pred[:, :, num_nodes * 2 : num_nodes * 3]
+    dir_3_pred = y_pred[:, :, num_nodes * 3 : num_nodes * 4]
+    dir_4_pred = y_pred[:, :, num_nodes * 4 : num_nodes * 5]
+
+    dir_1_true = y[:, :, num_nodes : num_nodes * 2]
+    dir_2_true = y[:, :, num_nodes * 2 : num_nodes * 3]
+    dir_3_true = y[:, :, num_nodes * 3 : num_nodes * 4]
+    dir_4_true = y[:, :, num_nodes * 4 : num_nodes * 5]
+
+    dir_1_index_true = torch.where(dir_1_true == 1)
+    dir_2_index_true = torch.where(dir_2_true == 1)
+    dir_3_index_true = torch.where(dir_3_true == 1)
+    dir_4_index_true = torch.where(dir_4_true == 1)
+
+    accuracy_dir_1 = torch.sum(
+        dir_1_pred[dir_1_index_true] == dir_1_true[dir_1_index_true]
+    ) / len(dir_1_index_true[0])
+    accuracy_dir_2 = torch.sum(
+        dir_2_pred[dir_2_index_true] == dir_2_true[dir_2_index_true]
+    ) / len(dir_2_index_true[0])
+    accuracy_dir_3 = torch.sum(
+        dir_3_pred[dir_3_index_true] == dir_3_true[dir_3_index_true]
+    ) / len(dir_3_index_true[0])
+    accuracy_dir_4 = torch.sum(
+        dir_4_pred[dir_4_index_true] == dir_4_true[dir_4_index_true]
+    ) / len(dir_4_index_true[0])
+
     accuracy_dir = (
-        accuracy_dir_0
-        + accuracy_dir_1
-        + accuracy_dir_2
-        + accuracy_dir_3
-        + accuracy_dir_4
+        accuracy_dir_1 + accuracy_dir_2 + accuracy_dir_3 + accuracy_dir_4
     ) / 5
     return {
         "accuracy_adj": accuracy_adj,
-        "accuracy_dir_0": accuracy_dir_0,
         "accuracy_dir_1": accuracy_dir_1,
         "accuracy_dir_2": accuracy_dir_2,
         "accuracy_dir_3": accuracy_dir_3,
