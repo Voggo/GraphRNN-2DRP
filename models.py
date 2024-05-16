@@ -78,7 +78,7 @@ def train_rnn(
     scheduler_rnn_edge = torch.optim.lr_scheduler.MultiStepLR(
         optimizer_rnn_edge, learning_rate_steps, gamma=0.2
     )
-    test_dataset = Dataset(num_nodes, test=True)
+    test_dataset = Dataset(num_nodes, test=False)
     test_data = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
     rnn_graph.train()
     rnn_edge.train()
@@ -258,11 +258,6 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             "test_losses": {"loss": [], "bce_adj": [], "bce_dir": [], "mae": []},
             "test_accuracies": {
                 "adj": [],
-                "dir_0": [],
-                "dir_1": [],
-                "dir_2": [],
-                "dir_3": [],
-                "dir_4": [],
                 "dir": [],
             },
         }
@@ -346,7 +341,6 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             y_pred[:, :, num_nodes : num_nodes * 2] *= torch.tril(1 - y_pred_adj)
             y_pred[:, :, :num_nodes] = y_pred_adj
-
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
             )
@@ -363,19 +357,13 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             print(
                 f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mae: {loss_l1.item()}"
             )
-            y_pred = torch.round(y_pred)
             # number of cells predicted is only lower triangle
             cells = 0.5 * (num_nodes - 1) * num_nodes * batch_size
             accuracies = accuracy(y_pred, y, cells, num_nodes)
             metrics["test_accuracies"]["adj"].append(accuracies["accuracy_adj"])
-            metrics["test_accuracies"]["dir_0"].append(accuracies["accuracy_dir_0"])
-            metrics["test_accuracies"]["dir_1"].append(accuracies["accuracy_dir_1"])
-            metrics["test_accuracies"]["dir_2"].append(accuracies["accuracy_dir_2"])
-            metrics["test_accuracies"]["dir_3"].append(accuracies["accuracy_dir_3"])
-            metrics["test_accuracies"]["dir_4"].append(accuracies["accuracy_dir_4"])
             metrics["test_accuracies"]["dir"].append(accuracies["accuracy_dir"])
             print(
-                f"accuracy adj: {accuracies['accuracy_adj']}, accuracy dir_0: {accuracies['accuracy_dir_0']}, accuracy dir_1: {accuracies['accuracy_dir_1']}, accuracy dir_2: {accuracies['accuracy_dir_2']}, accuracy dir_3: {accuracies['accuracy_dir_3']}, accuracy dir_4: {accuracies['accuracy_dir_4']}, accuracy dir: {accuracies['accuracy_dir']}"
+                f"accuracy adj: {accuracies['accuracy_adj']}, accuracy dir: {accuracies['accuracy_dir']}"
             )
         losses = metrics["test_losses"]
         metrics["test_mean_loss"] = {
@@ -387,11 +375,6 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
         accuracies = metrics["test_accuracies"]
         metrics["test_mean_accuracy"] = {
             "accuracy_adj": sum(accuracies["adj"]) / len(accuracies["adj"]),
-            "accuracy_dir_0": sum(accuracies["dir_0"]) / len(accuracies["dir_0"]),
-            "accuracy_dir_1": sum(accuracies["dir_1"]) / len(accuracies["dir_1"]),
-            "accuracy_dir_2": sum(accuracies["dir_2"]) / len(accuracies["dir_2"]),
-            "accuracy_dir_3": sum(accuracies["dir_3"]) / len(accuracies["dir_3"]),
-            "accuracy_dir_4": sum(accuracies["dir_4"]) / len(accuracies["dir_4"]),
             "accuracy_dir": sum(accuracies["dir"]) / len(accuracies["dir"]),
         }
         print(
@@ -470,7 +453,7 @@ def test_inference_rnn(
                 if output_edge[:, 0, 0] == 0:
                     dir = torch.argmax(F.sigmoid(output_edge[:, 0, 1:6]), 1)
                 else:
-                    dir = torch.argmax(F.sigmoid(output_edge[:, 0, 2:6]), 1)
+                    dir = torch.argmax(F.sigmoid(output_edge[:, 0, 2:6]), 1) + 1
                 output_edge[:, 0, 1 + dir] = 1
                 output_edge[:, 0, 1 : dir + 1] = 0
                 output_edge[:, 0, dir + 2 : 6] = 0
@@ -524,7 +507,7 @@ def test_inference_rnn(
         max_fill_ratio = 0
         min_overlap_area = 100000000
         max_utility = 0
-        for _ in range(1000):
+        for _ in range(10000):
             nodes_rects = [
                 Rectangle(node[0].item(), node[1].item(), 0) for node in nodes
             ]
@@ -536,7 +519,7 @@ def test_inference_rnn(
             # rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
             utility = (
-                fill_ratio - 0.1 * overlap_area / 10000 - 0.1 * cutoff_area / 10000
+                fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
             )
             # print(f"utility: {utility}")
             if utility > max_utility:
@@ -649,21 +632,21 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # "train" or "test"
-    mode = "test"
+    mode = "train"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_29"
+    model_dir_name = "model_33"
     # Size of the graph you want to train or test on
-    data_graph_size = 10
+    data_graph_size = 8
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 2000
+    epochs = 1000
     learning_rate_steps = [epochs // 2, epochs // 5 * 4]
     batch_size = 1
     hidden_size_1 = 64
     hidden_size_2 = 16
     num_layers = 4
-    lambda_ratios = {"kl_adj": 0.50, "kl_dir": 0.40, "l1": 0.10}
+    lambda_ratios = {"kl_adj": 0.30, "kl_dir": 0.30, "l1": 0.30}
 
     sample_size = 0  # automatically set
 
@@ -704,7 +687,7 @@ if __name__ == "__main__":
                 map_location=torch.device("cpu"),
             )
         )
-        # test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
+        test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
         for i in range(len(dataset)):
             test_inference_rnn(
                 device,
@@ -716,13 +699,13 @@ if __name__ == "__main__":
                 model_dir_name,
                 dataset,
             )
-        json.dump(
-            test_metrics,
-            open(
-                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_metrics.json",
-                "w",
-            ),
-        )
+        # json.dump(
+        #     test_metrics,
+        #     open(
+        #         f"models/{model_dir_name}_graph_size_{data_graph_size}/test_metrics.json",
+        #         "w",
+        #     ),
+        # )
     if mode == "train":
         if not os.path.exists(f"models/{model_dir_name}_graph_size_{data_graph_size}"):
             os.mkdir(f"models/{model_dir_name}_graph_size_{data_graph_size}")
@@ -771,8 +754,10 @@ if __name__ == "__main__":
             "lambda_ratios": lambda_ratios,
             "sample_size": sample_size,
         }
-        with open(
-            f"models/{model_dir_name}_graph_size_{data_graph_size}/hyperparameters.json",
-            "w",
-        ) as f:
-            json.dump(hyperparameters, f)
+        json.dump(
+            hyperparameters,
+            open(
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/hyperparameters.json",
+                "w",
+            ),
+        )
