@@ -468,10 +468,12 @@ def test_inference_rnn(
                 direction = 0
                 if output_edge[:, 0, 0] == 0:
                     output_edge[:, 0, 1:6] = F.sigmoid(output_edge[:, 0, 1:6])
-                    direction = torch.argmax(output_edge[:, 0, 1:6], 1)
+                    probabilities = F.softmax(output_edge[:, 0, 1:6], dim=1)
+                    direction = torch.multinomial(probabilities, 1).squeeze()
                 else:
                     output_edge[:, 0, 2:6] = F.sigmoid(output_edge[:, 0, 2:6])
-                    direction = torch.argmax(output_edge[:, 0, 2:6], 1) + 1
+                    probabilities = F.softmax(output_edge[:, 0, 2:6], dim=1)
+                    direction = torch.multinomial(probabilities, 1).squeeze() + 1
                 output_edge[:, 0, 1 + direction] = 1
                 output_edge[:, 0, 1 : direction + 1] = 0
                 output_edge[:, 0, direction + 2 : 6] = 0
@@ -513,29 +515,27 @@ def test_inference_rnn(
         offset = y_pred[0, :, num_nodes * 6 :].reshape(num_nodes, num_nodes)
         offset.diagonal().fill_(0)
         offset = offset + offset.T
-        print("current adj:")
-        print(data.data_bfs_adj[graph])
-        print(adj)
-        print("current edge dir:")
-        print(data.data_bfs_edge_dir[graph])
-        print(edge_dir)
-        print("current offset:")
-        print(data.data_bfs_offset[graph])
-        print(offset)
+        # print("current adj:")
+        # print(data.data_bfs_adj[graph])
+        # print(adj)
+        # print("current edge dir:")
+        # print(data.data_bfs_edge_dir[graph])
+        # print(edge_dir)
+        # print("current offset:")
+        # print(data.data_bfs_offset[graph])
+        # print(offset)
         # Convert edge_dir to boolean tensor where True indicates the presence of an edge
         edge_mask = edge_dir > 0
         # Use the mask to filter the adjacency matrix
         adj = torch.where(edge_mask, adj, torch.zeros_like(adj))
         best_rects = None
-        max_fill_ratio = 0
-        min_overlap_area = 100000000
         max_utility = 0
-        for _ in range(100):
+        for _ in range(1):
             nodes_rects = [
                 Rectangle(node[0].item(), node[1].item(), 0) for node in nodes
             ]
-            sampled_graph = sample_graph(adj.cpu().numpy())
-            # sampled_graph = adj.numpy()
+            # sampled_graph = sample_graph(adj.cpu().numpy())
+            sampled_graph = adj.numpy()
             rects = convert_graph_to_rects(
                 nodes_rects, sampled_graph, edge_dir.cpu().numpy(), offset.cpu().numpy()
             )
@@ -544,8 +544,6 @@ def test_inference_rnn(
             utility = fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
             # print(f"utility: {utility}")
             if utility > max_utility:
-                max_fill_ratio = fill_ratio
-                min_overlap_area = overlap_area
                 best_rects = rects
         # print(f"max fill ratio: {max_fill_ratio}")
         # print(f"min overlap area: {min_overlap_area}")
@@ -673,7 +671,7 @@ if __name__ == "__main__":
     sample_size = 0  # automatically set
 
     if mode == "test":
-        dataset = Dataset(data_graph_size, test=False)
+        dataset = Dataset(data_graph_size, test=True)
         data = torch.utils.data.DataLoader(
             dataset, batch_size=1, shuffle=False, num_workers=0
         )
@@ -713,24 +711,40 @@ if __name__ == "__main__":
         sum_fill_ratio = 0
         sum_overlap_area = 0
         sum_cutoff_area = 0
-        for i in range(len(dataset)):
-            rects = test_inference_rnn(
-                device,
-                hidden_size_1,
-                hidden_size_2,
-                data_graph_size,
-                i,
-                num_layers,
-                model_dir_name,
-                dataset,
-            )
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+        for i in range(len(dataset) // 10):
+            print(f"graph: {i}")
+            max_fill_ratio = 0
+            best_rects = None
+            for _ in range(100):
+                rects = test_inference_rnn(
+                    device,
+                    hidden_size_1,
+                    hidden_size_2,
+                    data_graph_size,
+                    i,
+                    num_layers,
+                    model_dir_name,
+                    dataset,
+                )
+                fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+                if fill_ratio > max_fill_ratio:
+                    max_fill_ratio = fill_ratio
+                    best_rects = rects
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
             sum_fill_ratio += fill_ratio
             sum_overlap_area += overlap_area
             sum_cutoff_area += cutoff_area
-        avr_fill_ratio = sum_fill_ratio / len(dataset)
-        avr_overlap_area = sum_overlap_area / len(dataset)
-        avr_cutoff_area = sum_cutoff_area / len(dataset)
+            plot_rects(
+                best_rects,
+                ax_lim=100,
+                ay_lim=100,
+                ax_min=-50,
+                ay_min=-50,
+                filename="rnn_rnn.png",
+            )
+        avr_fill_ratio = sum_fill_ratio / (len(dataset) // 10)
+        avr_overlap_area = sum_overlap_area / (len(dataset) // 10)
+        avr_cutoff_area = sum_cutoff_area / (len(dataset) // 10)
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
@@ -741,7 +755,7 @@ if __name__ == "__main__":
                 "avr_cutoff_area": avr_cutoff_area,
             },
             open(
-                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_inference_stats_training_data.json",
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_inference_stats.json",
                 "w",
             ),
         )
@@ -811,8 +825,19 @@ if __name__ == "__main__":
             for node in nodes:
                 rects.append(Rectangle(node[0], node[1], 0))
             adj, edge_dir, offset = generate_random_graph(rects, 100, 100)
-            rects = convert_graph_to_rects(rects, adj, edge_dir, offset)
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+            max_utility = 0
+            best_rects = None
+            for _ in range(100):
+                sampled_graph = sample_graph(adj)
+                new_rects = convert_graph_to_rects(rects, adj, edge_dir, offset)
+                fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                    new_rects, 100, 100
+                )
+                utility = fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
+                if max_utility < utility:
+                    max_utility = utility
+                    best_rects = new_rects
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
