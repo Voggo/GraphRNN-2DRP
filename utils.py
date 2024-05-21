@@ -4,8 +4,6 @@ from typing import List
 import random
 import networkx as nx
 
-# from littleballoffur import LoopErasedRandomWalkSampler, NonBackTrackingRandomWalkSampler
-
 from dataclasses_rect_point import Rectangle, Point
 
 
@@ -80,12 +78,12 @@ def sample_graph(adj: np.ndarray) -> np.ndarray:
     return new_adj
 
 
-# todo: change the accuracy function for directions
 def accuracy(y_pred, y, cells, num_nodes):
     accuracy_adj = (
-        int(torch.sum(torch.round(y_pred[:, :, :num_nodes]) == y[:, :, :num_nodes])) - cells
+        int(torch.sum(torch.round(y_pred[:, :, :num_nodes]) == y[:, :, :num_nodes]))
+        - cells
     ) / cells
-    
+
     edge_dir_pred = y_pred[0, :, num_nodes : num_nodes * 6]
     edge_dir_pred_splits = torch.split(edge_dir_pred, edge_dir_pred.size(1) // 5, dim=1)
     edge_dir_pred = torch.stack(edge_dir_pred_splits, dim=2)
@@ -95,10 +93,12 @@ def accuracy(y_pred, y, cells, num_nodes):
     edge_dir_splits = torch.split(edge_dir, edge_dir.size(1) // 5, dim=1)
     edge_dir = torch.stack(edge_dir_splits, dim=2)
     edge_dir = torch.argmax(edge_dir, dim=2)
-    
+
     sum_edges = torch.sum(y[:, :, :num_nodes])
     edge_mask = y[0, :, :num_nodes] == 1
-    accuracy_dir = float(torch.sum(edge_dir_pred[edge_mask] == edge_dir[edge_mask]) / sum_edges)
+    accuracy_dir = float(
+        torch.sum(edge_dir_pred[edge_mask] == edge_dir[edge_mask]) / sum_edges
+    )
 
     return {
         "accuracy_adj": accuracy_adj,

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from plot_rects import plot_rects
 from dataclasses_rect_point import Rectangle, Point
-from utils import *
+from utils import get_line_breaks, center_offset, convert_center_to_lower_left
 from eval_solutions import evaluate_solution
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -36,7 +36,7 @@ def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
     return rectangles
 
 
-def reduce_rects(rects: np.ndarray, convergence_limit=100) -> List[Rectangle]:
+def reduce_rects(rects: np.ndarray, stagnation_limit=100) -> List[Rectangle]:
     """Return a list of randomly reduced Rectangles from a list of Rectangles."""
 
     convergence = 0
@@ -117,7 +117,7 @@ def reduce_rects(rects: np.ndarray, convergence_limit=100) -> List[Rectangle]:
                 convergence = 0
 
         convergence += 1
-        if convergence > convergence_limit:
+        if convergence > stagnation_limit:
             print("Convergence limit reached. Exiting...")
             break
 
@@ -230,14 +230,14 @@ def convert_graph_to_rects(nodes, adj, edge_dir, offset):
 
 
 def generate_rects_and_graph(
-    width: int, height: int, n_breaks: int, convergence_limit=100
+    width: int, height: int, n_breaks: int, stagnation_limit=100
 ) -> tuple:
     """Generate a list of Rectangles and convert it to a graph."""
     rects = generate_rects(width, height, n_breaks)
-    reduced_rects = reduce_rects(rects, convergence_limit=100)
+    reduced_rects = reduce_rects(rects, stagnation_limit=stagnation_limit)
     while len(reduced_rects) == 1:
         rects = generate_rects(width, height, n_breaks)
-        reduced_rects = reduce_rects(rects, convergence_limit=100)
+        reduced_rects = reduce_rects(rects, stagnation_limit=stagnation_limit)
     adjacency_matrix, edge_directions, offset = convert_rects_to_graph(reduced_rects)
     return reduced_rects, adjacency_matrix, edge_directions, offset
 
@@ -262,7 +262,31 @@ def bfs_index(adj, start):  # redundent just for testing
     print(nodes)
     return nodes
 
+def generate_random_rect_positions(rects: list[Rectangle], width: int, height: int):
+    for rect in rects:
+        rect.lower_left = Point(random.randint(0, width), random.randint(0, height))
+    return rects
 
+def generate_random_graph(rects: list[Rectangle], width: int, height: int):
+    num_nodes = len(rects)
+    graph = nx.erdos_renyi_graph(num_nodes, 0.4)
+    adj = nx.to_numpy_array(graph)
+    edge_dir = np.random.randint(1, 5, size=(num_nodes, num_nodes))
+    offset = np.zeros((num_nodes, num_nodes), dtype=float)
+    edge_index = np.where(adj == 1)
+    for i in range(len(edge_index[0])):
+        node_from = edge_index[0][i]
+        node_to = edge_index[1][i]
+        if edge_dir[node_from, node_to] == 2 or edge_dir[node_from, node_to] == 4:
+            max_offset = (rects[node_to].height + rects[node_from].height) / 2
+            offset[node_from, node_to] = random.uniform(0, max_offset)
+        if edge_dir[node_from, node_to] == 1 or edge_dir[node_from, node_to] == 3:
+            max_offset = (rects[node_to].width + rects[node_from].width) / 2
+            offset[node_from, node_to] = random.uniform(0, max_offset)
+    return adj, edge_dir, offset
+            
+            
+    
 if __name__ == "__main__":
     (
         reduced_rects,
@@ -278,9 +302,6 @@ if __name__ == "__main__":
         nodes.append(copy.copy(rect))
     for node in nodes:
         node.lower_left = None
-    # rects_again = convert_graph_to_rects(
-    #     nodes, adjacency_matrix, edge_directions, edge_angle
-    # )
     bfs_order = bfs_index(adjacency_matrix, 0)
     bfs_nodes = [nodes[i] for i in bfs_order]
     bfs_adj = adjacency_matrix[np.ix_(bfs_order, bfs_order)]
@@ -289,7 +310,6 @@ if __name__ == "__main__":
     # show_graph_with_labels(adjacency_matrix, {i: i for i in range(len(reduced_rects))})
 
     rects_again = convert_graph_to_rects(bfs_nodes, bfs_adj, bfs_edge_dir, bfs_offset)
-    # rects_again = convert_center_to_lower_left(rects_again)
     print(evaluate_solution(rects_again, 50, 50))
     plot_rects(
         rects_again,

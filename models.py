@@ -1,14 +1,18 @@
+import os
+import json
 import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
-import os
-import json
-import numpy as np
 
+from torch.nn.utils import clip_grad_norm_
 from data import Dataset
 from plot_rects import plot_rects
-from generator import convert_graph_to_rects
-from dataclasses_rect_point import Rectangle, Point
+from generator import (
+    convert_graph_to_rects,
+    generate_random_graph,
+    generate_random_rect_positions,
+)
+from dataclasses_rect_point import Rectangle
 from utils import sample_graph, accuracy
 from eval_solutions import evaluate_solution
 
@@ -49,9 +53,9 @@ class RNN(torch.nn.Module):
         return torch.zeros(self.num_layers, batch_size, self.rnn.hidden_size)
 
     def forward(self, x):
-        input = self.embedding(x)
-        input = self.relu(input)
-        output, self.hidden = self.rnn(input, self.hidden)
+        encoded_input = self.embedding(x)
+        encoded_input = self.relu(encoded_input)
+        output, self.hidden = self.rnn(encoded_input, self.hidden)
         output_embed = self.output(output.clone())
         return output, output_embed
 
@@ -197,11 +201,17 @@ def train_rnn(
                 + lambda_ratios["kl_dir"] * loss_kl_dir
                 + lambda_ratios["l1"] * loss_l1
             )
-            loss_sum += loss.item()
+            loss_sum += loss_kl_adj.item() + loss_kl_dir.item() + loss_l1.item()
             loss_sum_adj += loss_kl_adj.item()
             loss_sum_dir += loss_kl_dir.item()
             loss_sum_l1 += loss_l1.item()
             loss.backward()
+            clip_grad_norm_(rnn_graph.parameters(), 0.1)
+            clip_grad_norm_(rnn_edge.parameters(), 0.1)
+            # grad_norm_graph = rnn_graph.embedding.weight.grad.norm()
+            # grad_norm_edge = rnn_edge.embedding.weight.grad.norm()
+            # print(f"grad norm graph: {grad_norm_graph}")
+            # print(f"grad norm edge:  {grad_norm_edge}")
             optimizer_rnn_graph.step()
             optimizer_rnn_edge.step()
         scheduler_rnn_graph.step()
@@ -213,7 +223,7 @@ def train_rnn(
         losses_mae.append(loss_sum_l1 / batches)
         if epoch % 5 == 0:
             print(
-                f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mae: {losses_mae[-1]}"
+                f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mae: {losses_mae[-1]}"  # pylint: disable=line-too-long
             )
         if (epoch + 1) % 100 == 0 and not epoch == 0:
             torch.save(
@@ -227,6 +237,8 @@ def train_rnn(
             metrics = test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data)
             test_mean_accuracy.append(metrics["test_mean_accuracy"])
             test_mean_loss.append(metrics["test_mean_loss"])
+            rnn_edge.train()
+            rnn_graph.train()
 
     torch.save(
         rnn_graph.state_dict(),
@@ -355,7 +367,7 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             metrics["test_losses"]["bce_dir"].append(loss_kl_dir.item())
             metrics["test_losses"]["mae"].append(loss_l1.item())
             print(
-                f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mae: {loss_l1.item()}"
+                f"loss: {loss.item()}, bce adj: {loss_kl_adj.item()}, bce dir: {loss_kl_dir.item()}, mae: {loss_l1.item()}"  # pylint: disable=line-too-long
             )
             # number of cells predicted is only lower triangle
             cells = 0.5 * (num_nodes - 1) * num_nodes * batch_size
@@ -363,7 +375,7 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             metrics["test_accuracies"]["adj"].append(accuracies["accuracy_adj"])
             metrics["test_accuracies"]["dir"].append(accuracies["accuracy_dir"])
             print(
-                f"accuracy adj: {accuracies['accuracy_adj']}, accuracy dir: {accuracies['accuracy_dir']}"
+                f"accuracy adj: {accuracies['accuracy_adj']}, accuracy dir: {accuracies['accuracy_dir']}"  # pylint: disable=line-too-long
             )
         losses = metrics["test_losses"]
         metrics["test_mean_loss"] = {
@@ -378,7 +390,10 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             "accuracy_dir": sum(accuracies["dir"]) / len(accuracies["dir"]),
         }
         print(
-            f"mean loss: {metrics['test_mean_loss']['loss_mean']}, mean bce adj: {metrics['test_mean_loss']['loss_bce_adj_mean']}, mean bce dir: {metrics['test_mean_loss']['loss_bce_dir_mean']}, mean mae: {metrics['test_mean_loss']['loss_mse_mean']}"
+            f"mean loss: {metrics['test_mean_loss']['loss_mean']}, mean bce adj: {metrics['test_mean_loss']['loss_bce_adj_mean']}, mean bce dir: {metrics['test_mean_loss']['loss_bce_dir_mean']}, mean mae: {metrics['test_mean_loss']['loss_mse_mean']}"  # pylint: disable=line-too-long
+        )
+        print(
+            f"mean accuracy adj: {metrics['test_mean_accuracy']['accuracy_adj']}, mean accuracy dir: {metrics['test_mean_accuracy']['accuracy_dir']}"  # pylint: disable=line-too-long
         )
         return metrics
 
@@ -417,9 +432,6 @@ def test_inference_rnn(
     with torch.no_grad():
         rnn_graph.eval()
         rnn_edge.eval()
-        print(data.data_bfs_adj[graph])
-        print(data.data_bfs_edge_dir[graph])
-        print(data.data_bfs_offset[graph])
         nodes = torch.tensor(data.data_bfs_nodes[graph]).to(device)
         x_step = torch.ones(batch_size, 1, num_nodes * 9).to(device)
         x_step[:, 0, 7 * num_nodes :] = torch.zeros(batch_size, 1, 2 * num_nodes).to(
@@ -440,8 +452,12 @@ def test_inference_rnn(
             edge_input_step_all = torch.zeros(batch_size, num_nodes, 11).to(device)
             edge_input_step[:, 0, 7] = nodes[0][0]
             edge_input_step[:, 0, 8] = nodes[0][1]
-            edge_input_step[:, 0, 9] = nodes[i][0]
-            edge_input_step[:, 0, 10] = nodes[i][1]
+            if i < len(nodes) - 1:
+                edge_input_step[:, 0, 9] = nodes[i + 1][0]
+                edge_input_step[:, 0, 10] = nodes[i + 1][1]
+            else:
+                edge_input_step[:, 0, 9] = 0
+                edge_input_step[:, 0, 10] = 0
             edge_y_pred = torch.zeros(batch_size, num_nodes, 9).to(device)
             for j in range(i + 1):
                 edge_input_step_all[:, j, :] = edge_input_step
@@ -449,14 +465,16 @@ def test_inference_rnn(
                 output_edge[:, 0, 0:1] = torch.bernoulli(
                     F.sigmoid(output_edge[:, 0, 0:1])
                 )
-                dir = 0
+                direction = 0
                 if output_edge[:, 0, 0] == 0:
-                    dir = torch.argmax(F.sigmoid(output_edge[:, 0, 1:6]), 1)
+                    output_edge[:, 0, 1:6] = F.sigmoid(output_edge[:, 0, 1:6])
+                    direction = torch.argmax(output_edge[:, 0, 1:6], 1)
                 else:
-                    dir = torch.argmax(F.sigmoid(output_edge[:, 0, 2:6]), 1) + 1
-                output_edge[:, 0, 1 + dir] = 1
-                output_edge[:, 0, 1 : dir + 1] = 0
-                output_edge[:, 0, dir + 2 : 6] = 0
+                    output_edge[:, 0, 2:6] = F.sigmoid(output_edge[:, 0, 2:6])
+                    direction = torch.argmax(output_edge[:, 0, 2:6], 1) + 1
+                output_edge[:, 0, 1 + direction] = 1
+                output_edge[:, 0, 1 : direction + 1] = 0
+                output_edge[:, 0, direction + 2 : 6] = 0
                 output_edge[:, 0, 0:] *= output_edge[:, 0, 0:1].clone()
                 edge_input_step[:, :, :7] = output_edge[0, 0, :]
                 if j < len(nodes) - 1:
@@ -466,8 +484,8 @@ def test_inference_rnn(
                     edge_input_step[:, 0, 7] = 0
                     edge_input_step[:, 0, 8] = 0
                 if i < len(nodes) - 1:
-                    edge_input_step[:, 0, 9] = nodes[i][0]
-                    edge_input_step[:, 0, 10] = nodes[i][1]
+                    edge_input_step[:, 0, 9] = nodes[i + 1][0]
+                    edge_input_step[:, 0, 10] = nodes[i + 1][1]
                 else:
                     edge_input_step[:, 0, 9] = 0
                     edge_input_step[:, 0, 10] = 0
@@ -479,7 +497,9 @@ def test_inference_rnn(
             x_step[:, :, 7 * num_nodes] = nodes[0][0]
             x_step[:, :, 8 * num_nodes] = nodes[0][1]
             x_step_all[:, i + 1, :] = x_step
-        y_pred = torch.cat((torch.zeros((1, 1, num_nodes * 7)), y_pred), dim=1)
+        y_pred = torch.cat(
+            (torch.zeros((1, 1, num_nodes * 7)).to(device), y_pred), dim=1
+        ).to(device)
         adj = y_pred[0, :, :num_nodes].reshape(num_nodes, num_nodes).to(torch.int64)
         adj.diagonal().fill_(0)
         adj = adj + adj.T.to(torch.int64)
@@ -488,16 +508,19 @@ def test_inference_rnn(
         edge_dir = torch.stack(edge_dir_splits, dim=2)
         edge_dir = torch.argmax(edge_dir, dim=2)
         edge_dir.diagonal().fill_(0)
-        mapping = torch.tensor([0, 3, 4, 1, 2])
+        mapping = torch.tensor([0, 3, 4, 1, 2]).to(device)
         edge_dir = (edge_dir + mapping[edge_dir].T).to(torch.int64)
         offset = y_pred[0, :, num_nodes * 6 :].reshape(num_nodes, num_nodes)
         offset.diagonal().fill_(0)
         offset = offset + offset.T
         print("current adj:")
+        print(data.data_bfs_adj[graph])
         print(adj)
         print("current edge dir:")
+        print(data.data_bfs_edge_dir[graph])
         print(edge_dir)
         print("current offset:")
+        print(data.data_bfs_offset[graph])
         print(offset)
         # Convert edge_dir to boolean tensor where True indicates the presence of an edge
         edge_mask = edge_dir > 0
@@ -507,36 +530,35 @@ def test_inference_rnn(
         max_fill_ratio = 0
         min_overlap_area = 100000000
         max_utility = 0
-        for _ in range(10000):
+        for _ in range(100):
             nodes_rects = [
                 Rectangle(node[0].item(), node[1].item(), 0) for node in nodes
             ]
-            sampled_graph = sample_graph(adj.numpy())
+            sampled_graph = sample_graph(adj.cpu().numpy())
             # sampled_graph = adj.numpy()
             rects = convert_graph_to_rects(
-                nodes_rects, sampled_graph, edge_dir.numpy(), offset.numpy()
+                nodes_rects, sampled_graph, edge_dir.cpu().numpy(), offset.cpu().numpy()
             )
             # rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
-            utility = (
-                fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
-            )
+            utility = fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
             # print(f"utility: {utility}")
             if utility > max_utility:
                 max_fill_ratio = fill_ratio
                 min_overlap_area = overlap_area
                 best_rects = rects
-        print(f"max fill ratio: {max_fill_ratio}")
-        print(f"min overlap area: {min_overlap_area}")
-        print(f"cut off area: {cutoff_area}")
-        plot_rects(
-            best_rects,
-            ax_lim=100,
-            ay_lim=100,
-            ax_min=-50,
-            ay_min=-50,
-            filename="rnn_rnn.png",
-        )
+        # print(f"max fill ratio: {max_fill_ratio}")
+        # print(f"min overlap area: {min_overlap_area}")
+        # print(f"cut off area: {cutoff_area}")
+        # plot_rects(
+        #     best_rects,
+        #     ax_lim=100,
+        #     ay_lim=100,
+        #     ax_min=-50,
+        #     ay_min=-50,
+        #     filename="rnn_rnn.png",
+        # )
+        return best_rects
 
 
 def plot_losses(
@@ -629,34 +651,34 @@ def train(
 if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = False
 
     # "train" or "test"
-    mode = "train"
+    mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_33"
+    model_dir_name = "model_8"
     # Size of the graph you want to train or test on
     data_graph_size = 8
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 1000
+    epochs = 3000
     learning_rate_steps = [epochs // 2, epochs // 5 * 4]
-    batch_size = 1
+    batch_size = 2
     hidden_size_1 = 64
-    hidden_size_2 = 16
-    num_layers = 4
-    lambda_ratios = {"kl_adj": 0.30, "kl_dir": 0.30, "l1": 0.30}
+    hidden_size_2 = 32
+    num_layers = 5
+    lambda_ratios = {"kl_adj": 0.20, "kl_dir": 0.60, "l1": 0.05}
 
     sample_size = 0  # automatically set
 
     if mode == "test":
         dataset = Dataset(data_graph_size, test=False)
         data = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=False, num_workers=0
+            dataset, batch_size=1, shuffle=False, num_workers=0
         )
         hp = {}
-        with open(
+        with open(  # pylint: disable=unspecified-encoding
             f"models/{model_dir_name}_graph_size_{data_graph_size}/hyperparameters.json",
             "r",
         ) as f:
@@ -674,22 +696,25 @@ if __name__ == "__main__":
             hp["hidden_size_2"],
             hp["num_layers"],
             output_size=7,
-        )
+        ).to(device)
         rnn_graph.load_state_dict(
             torch.load(
                 f"models/{model_dir_name}_graph_size_{data_graph_size}/rnn_graph_model.pth",
-                map_location=torch.device("cpu"),
+                map_location=torch.device("cpu") if not use_cuda else None,
             )
         )
         rnn_edge.load_state_dict(
             torch.load(
                 f"models/{model_dir_name}_graph_size_{data_graph_size}/rnn_edge_model.pth",
-                map_location=torch.device("cpu"),
+                map_location=torch.device("cpu") if not use_cuda else None,
             )
         )
         test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
+        sum_fill_ratio = 0
+        sum_overlap_area = 0
+        sum_cutoff_area = 0
         for i in range(len(dataset)):
-            test_inference_rnn(
+            rects = test_inference_rnn(
                 device,
                 hidden_size_1,
                 hidden_size_2,
@@ -699,13 +724,27 @@ if __name__ == "__main__":
                 model_dir_name,
                 dataset,
             )
-        # json.dump(
-        #     test_metrics,
-        #     open(
-        #         f"models/{model_dir_name}_graph_size_{data_graph_size}/test_metrics.json",
-        #         "w",
-        #     ),
-        # )
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+            sum_fill_ratio += fill_ratio
+            sum_overlap_area += overlap_area
+            sum_cutoff_area += cutoff_area
+        avr_fill_ratio = sum_fill_ratio / len(dataset)
+        avr_overlap_area = sum_overlap_area / len(dataset)
+        avr_cutoff_area = sum_cutoff_area / len(dataset)
+        print(f"avr fill ratio: {avr_fill_ratio}")
+        print(f"avr overlap area: {avr_overlap_area}")
+        print(f"avr cutoff area: {avr_cutoff_area}")
+        json.dump(
+            {
+                "avr_fill_ratio": avr_fill_ratio,
+                "avr_overlap_area": avr_overlap_area,
+                "avr_cutoff_area": avr_cutoff_area,
+            },
+            open(
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_inference_stats_training_data.json",
+                "w",
+            ),
+        )
     if mode == "train":
         if not os.path.exists(f"models/{model_dir_name}_graph_size_{data_graph_size}"):
             os.mkdir(f"models/{model_dir_name}_graph_size_{data_graph_size}")
@@ -760,4 +799,72 @@ if __name__ == "__main__":
                 f"models/{model_dir_name}_graph_size_{data_graph_size}/hyperparameters.json",
                 "w",
             ),
+        )
+    if mode == "random_graph":
+        dataset = Dataset(data_graph_size, test=True)
+        sum_fill_ratio = 0
+        sum_overlap_area = 0
+        sum_cutoff_area = 0
+        for i in range(len(dataset)):
+            nodes = dataset.data_bfs_nodes[i]
+            rects = []
+            for node in nodes:
+                rects.append(Rectangle(node[0], node[1], 0))
+            adj, edge_dir, offset = generate_random_graph(rects, 100, 100)
+            rects = convert_graph_to_rects(rects, adj, edge_dir, offset)
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+            print(f"fill ratio: {fill_ratio}")
+            print(f"overlap area: {overlap_area}")
+            print(f"cutoff area: {cutoff_area}")
+            sum_fill_ratio += fill_ratio
+            sum_overlap_area += overlap_area
+            sum_cutoff_area += cutoff_area
+            # plot_rects(rects, ax_lim=100, ay_lim=100, ax_min=-50, ay_min=-50)
+        avr_fill_ratio = sum_fill_ratio / len(dataset)
+        avr_overlap_area = sum_overlap_area / len(dataset)
+        avr_cutoff_area = sum_cutoff_area / len(dataset)
+        print(f"avr fill ratio: {avr_fill_ratio}")
+        print(f"avr overlap area: {avr_overlap_area}")
+        print(f"avr cutoff area: {avr_cutoff_area}")
+        json.dump(
+            {
+                "avr_fill_ratio": avr_fill_ratio,
+                "avr_overlap_area": avr_overlap_area,
+                "avr_cutoff_area": avr_cutoff_area,
+            },
+            open("datasets/random_graph_stats.json", "w"),
+        )
+
+    if mode == "random_pos":
+        dataset = Dataset(data_graph_size, test=True)
+        sum_fill_ratio = 0
+        sum_overlap_area = 0
+        sum_cutoff_area = 0
+        for i in range(len(dataset)):
+            nodes = dataset.data_bfs_nodes[i]
+            rects = []
+            for node in nodes:
+                rects.append(Rectangle(node[0], node[1], 0))
+            rects = generate_random_rect_positions(rects, 100, 100)
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+            print(f"fill ratio: {fill_ratio}")
+            print(f"overlap area: {overlap_area}")
+            print(f"cutoff area: {cutoff_area}")
+            sum_fill_ratio += fill_ratio
+            sum_overlap_area += overlap_area
+            sum_cutoff_area += cutoff_area
+            # plot_rects(rects, ax_lim=150, ay_lim=150, ax_min=0, ay_min=0)
+        avr_fill_ratio = sum_fill_ratio / len(dataset)
+        avr_overlap_area = sum_overlap_area / len(dataset)
+        avr_cutoff_area = sum_cutoff_area / len(dataset)
+        print(f"avr fill ratio: {avr_fill_ratio}")
+        print(f"avr overlap area: {avr_overlap_area}")
+        print(f"avr cutoff area: {avr_cutoff_area}")
+        json.dump(
+            {
+                "avr_fill_ratio": avr_fill_ratio,
+                "avr_overlap_area": avr_overlap_area,
+                "avr_cutoff_area": avr_cutoff_area,
+            },
+            open("datasets/random_pos_stats.json", "w"),
         )

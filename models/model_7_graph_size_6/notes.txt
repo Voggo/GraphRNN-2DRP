@@ -1,1 +1,0 @@
-Not finished only ran 300 epocs of sample size 10000

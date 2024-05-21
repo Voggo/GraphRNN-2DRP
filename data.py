@@ -24,9 +24,7 @@ def generate_datasets(num_graphs, height, width, test=False, n_breaks=5):
     data_bfs_offset = {i: [] for i in range(4, max_num_nodes + 1)}
     is_full = {i: False for i in range(4, max_num_nodes + 1)}
     while True:
-        rects, adj, edge_dir, offset = generate_rects_and_graph(
-            height, width, n_breaks
-        )
+        rects, adj, edge_dir, offset = generate_rects_and_graph(height, width, n_breaks)
         nodes_len = len(rects)
         if nodes_len < 4 or nodes_len > max_num_nodes or is_full[nodes_len]:
             continue
@@ -124,27 +122,20 @@ class Dataset(torch.utils.data.Dataset):
         y[6, :, :] = np.tril(self.data_bfs_offset[index][1:, :])
         x[7, :, :] = np.tril(self.data_nodes_width[index].T)
         x[8, :, :] = np.tril(self.data_nodes_height[index].T)
-        x[9, :, :] = np.tril(self.data_nodes_width[index])
-        x[10, :, :] = np.tril(self.data_nodes_height[index])
+
+        nodes_width = np.tril(self.data_nodes_width[index][1:, :])
+        nodes_height = np.tril(self.data_nodes_height[index][1:, :])
+        nodes_width = np.vstack((nodes_width, np.zeros((1, self.max_num_nodes))))
+        nodes_height = np.vstack((nodes_height, np.zeros((1, self.max_num_nodes))))
+        x[9, :, :] = np.tril(nodes_width)
+        x[10, :, :] = np.tril(nodes_height)
         y = torch.tensor(y)
         x = torch.tensor(x)
         return {"x": x, "y": y}
 
 
 if __name__ == "__main__":
-    generate_datasets(50, 100, 100, test=False)
-    data = Dataset(6, test=False)
+    generate_datasets(100, 100, 100, test=True)
+    data = Dataset(6, test=True)
+    print(len(data[0]["x"]))
     x = data[0]["x"]
-    print(x)
-    # for i in range(10):
-    #     d = data[i]
-    #     x = d["x"]
-    #     print(x)
-    #     # print(x)
-    #     print(d["y"].shape)
-    # training_data = torch.utils.data.DataLoader(
-    #     data, batch_size=2, shuffle=False
-    # )
-    # for batch in training_data:
-    #     print(batch["x"].shape)
-    #     print(batch["y"].shape)
