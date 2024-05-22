@@ -662,6 +662,7 @@ if __name__ == "__main__":
     learning_rate = 0.001
     epochs = 3000
     learning_rate_steps = [epochs // 2, epochs // 5 * 4]
+    input_embedding_scalar = 4 # divided by 9 to get ratio of input
     batch_size = 2
     hidden_size_1 = 64
     hidden_size_2 = 32
@@ -683,7 +684,7 @@ if __name__ == "__main__":
             hp = json.load(f)
         rnn_graph = RNN(
             9 * data_graph_size,
-            4 * data_graph_size,
+            hp["input_embedding_scalar"] * data_graph_size,
             hp["hidden_size_1"],
             hp["num_layers"],
             output_size=hp["hidden_size_2"],
@@ -771,7 +772,7 @@ if __name__ == "__main__":
 
         rnn_graph = RNN(
             data_graph_size * 9,
-            data_graph_size * 4,
+            data_graph_size * input_embedding_scalar,
             hidden_size_1,
             num_layers,
             output_size=hidden_size_2,
@@ -800,6 +801,7 @@ if __name__ == "__main__":
             "epochs": epochs,
             "learning_rate_steps": learning_rate_steps,
             "batch_size": batch_size,
+            "input_embedding_scalar": input_embedding_scalar,
             "hidden_size_1": hidden_size_1,
             "hidden_size_2": hidden_size_2,
             "num_layers": num_layers,
