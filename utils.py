@@ -89,10 +89,7 @@ def accuracy(y_pred, y, cells, num_nodes):
     edge_dir_pred = torch.stack(edge_dir_pred_splits, dim=2)
     edge_dir_pred = torch.argmax(edge_dir_pred, dim=2)
 
-    edge_dir = y[0, :, num_nodes : num_nodes * 6]
-    edge_dir_splits = torch.split(edge_dir, edge_dir.size(1) // 5, dim=1)
-    edge_dir = torch.stack(edge_dir_splits, dim=2)
-    edge_dir = torch.argmax(edge_dir, dim=2)
+    edge_dir = y[0, :, num_nodes : num_nodes * 2]
 
     sum_edges = torch.sum(y[:, :, :num_nodes])
     edge_mask = y[0, :, :num_nodes] == 1

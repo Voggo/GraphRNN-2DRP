@@ -52,6 +52,7 @@ def plot_rects(
             color="black",
         )
         ax.add_patch(plt_rect)
+    ax.autoscale(enable=True, axis="both")
     plt.savefig(
         f"plots_img/{filename}",
     )  # Save the figure before showing it

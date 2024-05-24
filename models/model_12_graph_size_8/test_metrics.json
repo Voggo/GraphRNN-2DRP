@@ -1,0 +1,86 @@
+{
+    "test_mean_loss": [
+        {
+            "loss_mean": 5.681892251968383,
+            "loss_bce_adj_mean": 0.15083277190104127,
+            "loss_bce_dir_mean": 1.2316929161548615,
+            "loss_mse_mean": 4.2993665599823
+        },
+        {
+            "loss_mean": 5.689251441955566,
+            "loss_bce_adj_mean": 0.18395446928218007,
+            "loss_bce_dir_mean": 1.2720609486103058,
+            "loss_mse_mean": 4.233236033916473
+        },
+        {
+            "loss_mean": 5.286083376407623,
+            "loss_bce_adj_mean": 0.17222092039883136,
+            "loss_bce_dir_mean": 1.2637789535522461,
+            "loss_mse_mean": 3.850083465576172
+        },
+        {
+            "loss_mean": 5.230891003608703,
+            "loss_bce_adj_mean": 0.17332432817667723,
+            "loss_bce_dir_mean": 1.2651071655750274,
+            "loss_mse_mean": 3.7924595189094545
+        },
+        {
+            "loss_mean": 5.233382904529572,
+            "loss_bce_adj_mean": 0.18099077865481378,
+            "loss_bce_dir_mean": 1.2750363624095917,
+            "loss_mse_mean": 3.7773557651042937
+        },
+        {
+            "loss_mean": 5.206949303150177,
+            "loss_bce_adj_mean": 0.19332229997962713,
+            "loss_bce_dir_mean": 1.28629643201828,
+            "loss_mse_mean": 3.7273305678367614
+        },
+        {
+            "loss_mean": 5.208177740573883,
+            "loss_bce_adj_mean": 0.20034426540136338,
+            "loss_bce_dir_mean": 1.2919183456897736,
+            "loss_mse_mean": 3.7159151470661165
+        },
+        {
+            "loss_mean": 5.229910161495209,
+            "loss_bce_adj_mean": 0.20479597436264158,
+            "loss_bce_dir_mean": 1.2955348324775695,
+            "loss_mse_mean": 3.7295793426036834
+        }
+    ],
+    "test_mean_accuracy": [
+        {
+            "accuracy_adj": 0.8714285714285716,
+            "accuracy_dir": 0.36701500877737997
+        },
+        {
+            "accuracy_adj": 0.8500000000000004,
+            "accuracy_dir": 0.3761816750466824
+        },
+        {
+            "accuracy_adj": 0.8503571428571428,
+            "accuracy_dir": 0.34799329936504364
+        },
+        {
+            "accuracy_adj": 0.8575000000000002,
+            "accuracy_dir": 0.3418304850161076
+        },
+        {
+            "accuracy_adj": 0.8453571428571435,
+            "accuracy_dir": 0.32320548363029955
+        },
+        {
+            "accuracy_adj": 0.8410714285714288,
+            "accuracy_dir": 0.3278578221797943
+        },
+        {
+            "accuracy_adj": 0.8450000000000002,
+            "accuracy_dir": 0.3299730175733566
+        },
+        {
+            "accuracy_adj": 0.845,
+            "accuracy_dir": 0.328868298009038
+        }
+    ]
+}

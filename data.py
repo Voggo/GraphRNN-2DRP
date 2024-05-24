@@ -108,18 +108,18 @@ class Dataset(torch.utils.data.Dataset):
         x[0, 1:, :] = np.tril(self.data_bfs_adj[index][1:, :])
         y[0, :, :] = np.tril(self.data_bfs_adj[index][1:, :])
         x[1, 1:, :] = np.tril(edge_dir[1:, :, 0])
-        y[1, :, :] = np.tril(edge_dir[1:, :, 0])
+        y[1, :, :] = np.tril(self.data_bfs_edge_dir[index][1:, :])
         x[2, 1:, :] = np.tril(edge_dir[1:, :, 1])
-        y[2, :, :] = np.tril(edge_dir[1:, :, 1])
+
         x[3, 1:, :] = np.tril(edge_dir[1:, :, 2])
-        y[3, :, :] = np.tril(edge_dir[1:, :, 2])
+
         x[4, 1:, :] = np.tril(edge_dir[1:, :, 3])
-        y[4, :, :] = np.tril(edge_dir[1:, :, 3])
+
         x[5, 1:, :] = np.tril(edge_dir[1:, :, 4])
-        y[5, :, :] = np.tril(edge_dir[1:, :, 4])
+  
 
         x[6, 1:, :] = np.tril(self.data_bfs_offset[index][1:, :])
-        y[6, :, :] = np.tril(self.data_bfs_offset[index][1:, :])
+        y[2, :, :] = np.tril(self.data_bfs_offset[index][1:, :])
         x[7, :, :] = np.tril(self.data_nodes_width[index].T)
         x[8, :, :] = np.tril(self.data_nodes_height[index].T)
 
@@ -135,7 +135,9 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    generate_datasets(100, 100, 100, test=True)
-    data = Dataset(6, test=True)
-    print(len(data[0]["x"]))
-    x = data[0]["x"]
+    # generate_datasets(100, 100, 100, test=True)
+    data = Dataset(8, test=True)
+    print(f"test len: {len(data)}")
+    data = Dataset(6, test=False)
+    print(f"train len: {len(data)}")
+    

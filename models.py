@@ -82,7 +82,7 @@ def train_rnn(
     scheduler_rnn_edge = torch.optim.lr_scheduler.MultiStepLR(
         optimizer_rnn_edge, learning_rate_steps, gamma=0.2
     )
-    test_dataset = Dataset(num_nodes, test=False)
+    test_dataset = Dataset(num_nodes, test=True)
     test_data = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
     rnn_graph.train()
     rnn_edge.train()
@@ -123,10 +123,6 @@ def train_rnn(
                     y_bumpy[:, 0, :, :],
                     y_bumpy[:, 1, :, :],
                     y_bumpy[:, 2, :, :],
-                    y_bumpy[:, 3, :, :],
-                    y_bumpy[:, 4, :, :],
-                    y_bumpy[:, 5, :, :],
-                    y_bumpy[:, 6, :, :],
                 ),
                 dim=2,
             ).to(device)
@@ -158,8 +154,7 @@ def train_rnn(
                 )
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
-                output_edge = output_edge[:, :, :]
-                output_edge[:, :, 0:6] = F.sigmoid(output_edge[:, :, 0:6])
+                output_edge[:, :, 0:1] = F.sigmoid(output_edge[:, :, 0:1])
                 output_edge = torch.cat(
                     (
                         output_edge[:, :, 0:1].mT,
@@ -173,27 +168,29 @@ def train_rnn(
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            y_pred_adj = torch.tril(y_pred[:, :, :num_nodes].clone())
+            y_pred_adj = torch.round(torch.tril(y_pred[:, :, :num_nodes].clone()))
             y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
             y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
             y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
             y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             y_pred[:, :, num_nodes : num_nodes * 2] *= torch.tril(1 - y_pred_adj)
-            y_pred[:, :, :num_nodes] = y_pred_adj
+            y_pred[:, :, :num_nodes] = torch.tril(y_pred[:, :, :num_nodes].clone())
             loss_kl_adj = (
                 F.binary_cross_entropy(y_pred[:, :, :num_nodes], y[:, :, :num_nodes])
                 / batch_size
             )
+            splits = torch.split(y_pred[:, :, num_nodes : num_nodes * 6], num_nodes, dim=2)
+            y_pred_dir = torch.stack(splits, dim=1)
             loss_kl_dir = (
-                F.binary_cross_entropy(
-                    y_pred[:, :, num_nodes : num_nodes * 6],
-                    y[:, :, num_nodes : num_nodes * 6],
+                F.cross_entropy(
+                    y_pred_dir,
+                    y_bumpy[:, 1, :, :].to(torch.int64),
                 )
                 / batch_size
             )
             loss_l1 = (
-                F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :])
+                F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 2 :])
                 / batch_size
             )
             loss = (
@@ -206,8 +203,8 @@ def train_rnn(
             loss_sum_dir += loss_kl_dir.item()
             loss_sum_l1 += loss_l1.item()
             loss.backward()
-            clip_grad_norm_(rnn_graph.parameters(), 0.1)
-            clip_grad_norm_(rnn_edge.parameters(), 0.1)
+            clip_grad_norm_(rnn_graph.parameters(), 0.01)
+            clip_grad_norm_(rnn_edge.parameters(), 0.01)
             # grad_norm_graph = rnn_graph.embedding.weight.grad.norm()
             # grad_norm_edge = rnn_edge.embedding.weight.grad.norm()
             # print(f"grad norm graph: {grad_norm_graph}")
@@ -265,7 +262,7 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
     rnn_edge.eval()
     batch_size = test_data.batch_size
     with torch.no_grad():
-        # losses pr batch in the dataset
+        # losses pr graph in the dataset
         metrics = {
             "test_losses": {"loss": [], "bce_adj": [], "bce_dir": [], "mae": []},
             "test_accuracies": {
@@ -295,10 +292,6 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
                     y_bumpy[:, 0, :, :],
                     y_bumpy[:, 1, :, :],
                     y_bumpy[:, 2, :, :],
-                    y_bumpy[:, 3, :, :],
-                    y_bumpy[:, 4, :, :],
-                    y_bumpy[:, 5, :, :],
-                    y_bumpy[:, 6, :, :],
                 ),
                 dim=2,
             ).to(device)
@@ -330,8 +323,7 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
                 )
                 # (batch_size, seq_len(node_len), features)
                 _, output_edge = rnn_edge(edge_input.clone())
-                output_edge = output_edge[:, :, :]
-                output_edge[:, :, 0:6] = F.sigmoid(output_edge[:, :, 0:6])
+                output_edge[:, :, 0:1] = F.sigmoid(output_edge[:, :, 0:1])
                 output_edge = torch.cat(
                     (
                         output_edge[:, :, 0:1].mT,
@@ -345,22 +337,30 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
                     dim=2,
                 )
                 y_pred[:, i, :] = output_edge[:, 0, :]
-            y_pred_adj = torch.tril(y_pred[:, :, :num_nodes].clone())
+            y_pred_adj = torch.round(torch.tril(y_pred[:, :, :num_nodes].clone()))
             y_pred[:, :, num_nodes * 6 :] *= y_pred_adj
             y_pred[:, :, num_nodes * 5 : num_nodes * 6] *= y_pred_adj
             y_pred[:, :, num_nodes * 4 : num_nodes * 5] *= y_pred_adj
             y_pred[:, :, num_nodes * 3 : num_nodes * 4] *= y_pred_adj
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             y_pred[:, :, num_nodes : num_nodes * 2] *= torch.tril(1 - y_pred_adj)
-            y_pred[:, :, :num_nodes] = y_pred_adj
+            y_pred[:, :, :num_nodes] = torch.tril(y_pred[:, :, :num_nodes].clone())
             loss_kl_adj = F.binary_cross_entropy(
                 y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
+            ) / batch_size
+            splits = torch.split(y_pred[:, :, num_nodes : num_nodes * 6], num_nodes, dim=2)
+            y_pred_dir = torch.stack(splits, dim=1)
+            loss_kl_dir = (
+                F.cross_entropy(
+                    y_pred_dir,
+                    y_bumpy[:, 1, :, :].to(torch.int64),
+                )
+                / batch_size
             )
-            loss_kl_dir = F.binary_cross_entropy(
-                y_pred[:, :, num_nodes : num_nodes * 6],
-                y[:, :, num_nodes : num_nodes * 6],
+            loss_l1 = (
+                F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 2 :])
+                / batch_size
             )
-            loss_l1 = F.l1_loss(y_pred[:, :, num_nodes * 6 :], y[:, :, num_nodes * 6 :])
             loss = loss_kl_adj + loss_kl_dir + loss_l1
             metrics["test_losses"]["loss"].append(loss.item())
             metrics["test_losses"]["bce_adj"].append(loss_kl_adj.item())
@@ -400,6 +400,7 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
 
 def test_inference_rnn(
     device,
+    input_embedding_scalar,
     hidden_size_1,
     hidden_size_2,
     num_nodes,
@@ -411,7 +412,7 @@ def test_inference_rnn(
 ):
     rnn_graph = RNN(
         num_nodes * 9,
-        num_nodes * 4,
+        num_nodes * input_embedding_scalar,
         hidden_size_1,
         num_layers,
         output_size=hidden_size_2,
@@ -467,11 +468,9 @@ def test_inference_rnn(
                 )
                 direction = 0
                 if output_edge[:, 0, 0] == 0:
-                    output_edge[:, 0, 1:6] = F.sigmoid(output_edge[:, 0, 1:6])
                     probabilities = F.softmax(output_edge[:, 0, 1:6], dim=1)
                     direction = torch.multinomial(probabilities, 1).squeeze()
                 else:
-                    output_edge[:, 0, 2:6] = F.sigmoid(output_edge[:, 0, 2:6])
                     probabilities = F.softmax(output_edge[:, 0, 2:6], dim=1)
                     direction = torch.multinomial(probabilities, 1).squeeze() + 1
                 output_edge[:, 0, 1 + direction] = 1
@@ -654,20 +653,20 @@ if __name__ == "__main__":
     # "train" or "test"
     mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_8"
+    model_dir_name = "model_13"
     # Size of the graph you want to train or test on
     data_graph_size = 8
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
-    epochs = 3000
-    learning_rate_steps = [epochs // 2, epochs // 5 * 4]
-    input_embedding_scalar = 4 # divided by 9 to get ratio of input
-    batch_size = 2
+    epochs = 4000
+    learning_rate_steps = [epochs // 1.5, epochs // 5 * 4]
+    batch_size = 50
+    input_embedding_scalar = 6  # divided by 9 to get ratio of input
     hidden_size_1 = 64
     hidden_size_2 = 32
     num_layers = 5
-    lambda_ratios = {"kl_adj": 0.20, "kl_dir": 0.60, "l1": 0.05}
+    lambda_ratios = {"kl_adj": 0.10, "kl_dir": 0.60, "l1": 0.30}
 
     sample_size = 0  # automatically set
 
@@ -709,48 +708,58 @@ if __name__ == "__main__":
             )
         )
         test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
-        sum_fill_ratio = 0
-        sum_overlap_area = 0
-        sum_cutoff_area = 0
-        for i in range(len(dataset) // 10):
+        fill_ratios = []
+        overlap_areas = []
+        cutoff_areas = []
+        for i in range(len(dataset)):
             print(f"graph: {i}")
-            max_fill_ratio = 0
+            max_utility = 0
             best_rects = None
-            for _ in range(100):
+            for _ in range(200):
                 rects = test_inference_rnn(
                     device,
-                    hidden_size_1,
-                    hidden_size_2,
-                    data_graph_size,
+                    hp["input_embedding_scalar"],
+                    hp["hidden_size_1"],
+                    hp["hidden_size_2"],
+                    hp["data_graph_size"],
                     i,
-                    num_layers,
+                    hp["num_layers"],
                     model_dir_name,
                     dataset,
                 )
-                fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
-                if fill_ratio > max_fill_ratio:
-                    max_fill_ratio = fill_ratio
+                fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                    rects, 100, 100
+                )
+                utility = fill_ratio - 0.0 * (overlap_area / 10000) - 0.0 * (cutoff_area / 10000)
+                if utility > max_utility:
+                    max_utility = utility
                     best_rects = rects
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
-            sum_fill_ratio += fill_ratio
-            sum_overlap_area += overlap_area
-            sum_cutoff_area += cutoff_area
-            plot_rects(
-                best_rects,
-                ax_lim=100,
-                ay_lim=100,
-                ax_min=-50,
-                ay_min=-50,
-                filename="rnn_rnn.png",
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                best_rects, 100, 100
             )
-        avr_fill_ratio = sum_fill_ratio / (len(dataset) // 10)
-        avr_overlap_area = sum_overlap_area / (len(dataset) // 10)
-        avr_cutoff_area = sum_cutoff_area / (len(dataset) // 10)
+            fill_ratios.append(fill_ratio)
+            overlap_areas.append(overlap_area)
+            cutoff_areas.append(cutoff_area)
+            print(f"fill ratio: {fill_ratio}, overlap area: {overlap_area}, cutoff area: {cutoff_area}")
+            # plot_rects(
+            #     best_rects,
+            #     ax_lim=100,
+            #     ay_lim=100,
+            #     ax_min=-50,
+            #     ay_min=-50,
+            #     filename="rnn_rnn.png",
+            # )
+        avr_fill_ratio = sum(fill_ratios) / (len(dataset))
+        avr_overlap_area = sum(overlap_areas) / (len(dataset))
+        avr_cutoff_area = sum(cutoff_areas) / (len(dataset))
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
         json.dump(
             {
+                "fill_ratios": fill_ratios,
+                "overlap_areas": overlap_areas,
+                "cutoff_areas": cutoff_areas,
                 "avr_fill_ratio": avr_fill_ratio,
                 "avr_overlap_area": avr_overlap_area,
                 "avr_cutoff_area": avr_cutoff_area,
@@ -818,9 +827,9 @@ if __name__ == "__main__":
         )
     if mode == "random_graph":
         dataset = Dataset(data_graph_size, test=True)
-        sum_fill_ratio = 0
-        sum_overlap_area = 0
-        sum_cutoff_area = 0
+        fill_ratios = []
+        overlap_areas = []
+        cutoff_areas = []
         for i in range(len(dataset)):
             nodes = dataset.data_bfs_nodes[i]
             rects = []
@@ -835,21 +844,25 @@ if __name__ == "__main__":
                 fill_ratio, overlap_area, cutoff_area = evaluate_solution(
                     new_rects, 100, 100
                 )
-                utility = fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
+                utility = (
+                    fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
+                )
                 if max_utility < utility:
                     max_utility = utility
                     best_rects = new_rects
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                best_rects, 100, 100
+            )
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
-            sum_fill_ratio += fill_ratio
-            sum_overlap_area += overlap_area
-            sum_cutoff_area += cutoff_area
+            fill_ratios.append(fill_ratio)
+            overlap_areas.append(overlap_area)
+            cutoff_areas.append(cutoff_area)
             # plot_rects(rects, ax_lim=100, ay_lim=100, ax_min=-50, ay_min=-50)
-        avr_fill_ratio = sum_fill_ratio / len(dataset)
-        avr_overlap_area = sum_overlap_area / len(dataset)
-        avr_cutoff_area = sum_cutoff_area / len(dataset)
+        avr_fill_ratio = sum(fill_ratios) / len(dataset)
+        avr_overlap_area = sum(overlap_areas) / len(dataset)
+        avr_cutoff_area = sum(cutoff_areas) / len(dataset)
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
@@ -864,9 +877,9 @@ if __name__ == "__main__":
 
     if mode == "random_pos":
         dataset = Dataset(data_graph_size, test=True)
-        sum_fill_ratio = 0
-        sum_overlap_area = 0
-        sum_cutoff_area = 0
+        fill_ratios = []
+        overlap_areas = []
+        cutoff_areas = []
         for i in range(len(dataset)):
             nodes = dataset.data_bfs_nodes[i]
             rects = []
@@ -877,13 +890,13 @@ if __name__ == "__main__":
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
-            sum_fill_ratio += fill_ratio
-            sum_overlap_area += overlap_area
-            sum_cutoff_area += cutoff_area
+            fill_ratios.append(fill_ratio)
+            overlap_areas.append(overlap_area)
+            cutoff_areas.append(cutoff_area)
             # plot_rects(rects, ax_lim=150, ay_lim=150, ax_min=0, ay_min=0)
-        avr_fill_ratio = sum_fill_ratio / len(dataset)
-        avr_overlap_area = sum_overlap_area / len(dataset)
-        avr_cutoff_area = sum_cutoff_area / len(dataset)
+        avr_fill_ratio = sum(fill_ratios) / len(dataset)
+        avr_overlap_area = sum(overlap_areas) / len(dataset)
+        avr_cutoff_area = sum(cutoff_areas) / len(dataset)
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
