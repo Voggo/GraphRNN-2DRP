@@ -222,7 +222,7 @@ def train_rnn(
             print(
                 f"epoch: {epoch}, loss: {losses[-1]}, bce adj: {losses_bce_adj[-1]}, bce dir: {losses_bce_dir[-1]}, mae: {losses_mae[-1]}"  # pylint: disable=line-too-long
             )
-        if (epoch + 1) % 100 == 0 and not epoch == 0:
+        if (epoch + 1) % 50 == 0 and not epoch == 0:
             torch.save(
                 rnn_graph.state_dict(),
                 f"models/{model_dir_name}_graph_size_{num_nodes}/rnn_graph_model.pth",
@@ -651,7 +651,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = False
 
     # "train" or "test"
-    mode = "test"
+    mode = "random_graph"
     # Name of model if training is selected it is created in testing it is loaded
     model_dir_name = "model_13"
     # Size of the graph you want to train or test on
@@ -671,7 +671,7 @@ if __name__ == "__main__":
     sample_size = 0  # automatically set
 
     if mode == "test":
-        dataset = Dataset(data_graph_size, test=True)
+        dataset = Dataset(data_graph_size, test=False)
         data = torch.utils.data.DataLoader(
             dataset, batch_size=1, shuffle=False, num_workers=0
         )
@@ -741,14 +741,14 @@ if __name__ == "__main__":
             overlap_areas.append(overlap_area)
             cutoff_areas.append(cutoff_area)
             print(f"fill ratio: {fill_ratio}, overlap area: {overlap_area}, cutoff area: {cutoff_area}")
-            # plot_rects(
-            #     best_rects,
-            #     ax_lim=100,
-            #     ay_lim=100,
-            #     ax_min=-50,
-            #     ay_min=-50,
-            #     filename="rnn_rnn.png",
-            # )
+            plot_rects(
+                best_rects,
+                ax_lim=100,
+                ay_lim=100,
+                ax_min=-50,
+                ay_min=-50,
+                filename="rnn_rnn.png",
+            )
         avr_fill_ratio = sum(fill_ratios) / (len(dataset))
         avr_overlap_area = sum(overlap_areas) / (len(dataset))
         avr_cutoff_area = sum(cutoff_areas) / (len(dataset))
@@ -833,26 +833,22 @@ if __name__ == "__main__":
         for i in range(len(dataset)):
             nodes = dataset.data_bfs_nodes[i]
             rects = []
-            for node in nodes:
-                rects.append(Rectangle(node[0], node[1], 0))
-            adj, edge_dir, offset = generate_random_graph(rects, 100, 100)
-            max_utility = 0
             best_rects = None
-            for _ in range(100):
-                sampled_graph = sample_graph(adj)
+            max_fill_ratio = 0
+            for _ in range(200):
+                rects = []
+                for node in nodes:
+                    rects.append(Rectangle(node[0], node[1], 0))
+                adj, edge_dir, offset = generate_random_graph(rects, 100, 100)
                 new_rects = convert_graph_to_rects(rects, adj, edge_dir, offset)
                 fill_ratio, overlap_area, cutoff_area = evaluate_solution(
                     new_rects, 100, 100
                 )
-                utility = (
-                    fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
-                )
-                if max_utility < utility:
-                    max_utility = utility
+                if fill_ratio > max_fill_ratio:
+                    max_fill_ratio = fill_ratio
                     best_rects = new_rects
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(
-                best_rects, 100, 100
-            )
+                
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
@@ -868,6 +864,9 @@ if __name__ == "__main__":
         print(f"avr cutoff area: {avr_cutoff_area}")
         json.dump(
             {
+                "fill_ratios": fill_ratios,
+                "overlap_areas": overlap_areas,
+                "cutoff_areas": cutoff_areas,
                 "avr_fill_ratio": avr_fill_ratio,
                 "avr_overlap_area": avr_overlap_area,
                 "avr_cutoff_area": avr_cutoff_area,
@@ -883,10 +882,18 @@ if __name__ == "__main__":
         for i in range(len(dataset)):
             nodes = dataset.data_bfs_nodes[i]
             rects = []
-            for node in nodes:
-                rects.append(Rectangle(node[0], node[1], 0))
-            rects = generate_random_rect_positions(rects, 100, 100)
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+            best_rects = None
+            max_fill_ratio = 0
+            for _ in range(200):
+                rects = []
+                for node in nodes:
+                    rects.append(Rectangle(node[0], node[1], 0))
+                rects = generate_random_rect_positions(rects, 100, 100)
+                fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+                if fill_ratio > max_fill_ratio:
+                    max_fill_ratio = fill_ratio
+                    best_rects = rects
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
@@ -902,6 +909,9 @@ if __name__ == "__main__":
         print(f"avr cutoff area: {avr_cutoff_area}")
         json.dump(
             {
+                "fill_ratios": fill_ratios,
+                "overlap_areas": overlap_areas,
+                "cutoff_areas": cutoff_areas,
                 "avr_fill_ratio": avr_fill_ratio,
                 "avr_overlap_area": avr_overlap_area,
                 "avr_cutoff_area": avr_cutoff_area,

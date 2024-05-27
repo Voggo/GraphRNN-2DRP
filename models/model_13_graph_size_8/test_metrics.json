@@ -1,1 +1,106 @@
-{"test_mean_loss": [{"loss_mean": 5.067400841712952, "loss_bce_adj_mean": 0.1805572710558772, "loss_bce_dir_mean": 1.2657159507274627, "loss_mse_mean": 3.6211276030540467}, {"loss_mean": 4.840669260025025, "loss_bce_adj_mean": 0.1787991972081363, "loss_bce_dir_mean": 1.2710009360313415, "loss_mse_mean": 3.3908691108226776}, {"loss_mean": 4.782829828262329, "loss_bce_adj_mean": 0.17501340644434094, "loss_bce_dir_mean": 1.2685303020477294, "loss_mse_mean": 3.3392861175537107}, {"loss_mean": 4.82861236333847, "loss_bce_adj_mean": 0.1819722648523748, "loss_bce_dir_mean": 1.2813290786743163, "loss_mse_mean": 3.365311039686203}, {"loss_mean": 4.810011055469513, "loss_bce_adj_mean": 0.1834639887139201, "loss_bce_dir_mean": 1.2754049742221831, "loss_mse_mean": 3.351142089366913}, {"loss_mean": 4.7389175319671635, "loss_bce_adj_mean": 0.17692025220021607, "loss_bce_dir_mean": 1.2685693049430846, "loss_mse_mean": 3.293427964448929}, {"loss_mean": 4.819374160766602, "loss_bce_adj_mean": 0.21707303892821073, "loss_bce_dir_mean": 1.2975107431411743, "loss_mse_mean": 3.3047903537750245}, {"loss_mean": 4.980428957939148, "loss_bce_adj_mean": 0.2736192091135308, "loss_bce_dir_mean": 1.3504492402076722, "loss_mse_mean": 3.3563604843616486}, {"loss_mean": 5.04929826259613, "loss_bce_adj_mean": 0.309678543638438, "loss_bce_dir_mean": 1.380568335056305, "loss_mse_mean": 3.359051368832588}, {"loss_mean": 5.125486171245575, "loss_bce_adj_mean": 0.3655109397834167, "loss_bce_dir_mean": 1.39836128950119, "loss_mse_mean": 3.361613946557045}], "test_mean_accuracy": [{"accuracy_adj": 0.8514285714285716, "accuracy_dir": 0.35594605788588524}, {"accuracy_adj": 0.8521428571428571, "accuracy_dir": 0.35610919646918776}, {"accuracy_adj": 0.8553571428571429, "accuracy_dir": 0.3457699111104012}, {"accuracy_adj": 0.8514285714285711, "accuracy_dir": 0.3331291536986828}, {"accuracy_adj": 0.8614285714285717, "accuracy_dir": 0.357613774985075}, {"accuracy_adj": 0.8628571428571429, "accuracy_dir": 0.3442993495613337}, {"accuracy_adj": 0.8578571428571432, "accuracy_dir": 0.36402513675391673}, {"accuracy_adj": 0.8499999999999999, "accuracy_dir": 0.36801218129694463}, {"accuracy_adj": 0.8514285714285714, "accuracy_dir": 0.3827047584950924}, {"accuracy_adj": 0.8514285714285712, "accuracy_dir": 0.37950027637183664}]}
+{
+    "test_mean_loss": [
+        {
+            "loss_mean": 5.067400841712952,
+            "loss_bce_adj_mean": 0.1805572710558772,
+            "loss_bce_dir_mean": 1.2657159507274627,
+            "loss_mse_mean": 3.6211276030540467
+        },
+        {
+            "loss_mean": 4.840669260025025,
+            "loss_bce_adj_mean": 0.1787991972081363,
+            "loss_bce_dir_mean": 1.2710009360313415,
+            "loss_mse_mean": 3.3908691108226776
+        },
+        {
+            "loss_mean": 4.782829828262329,
+            "loss_bce_adj_mean": 0.17501340644434094,
+            "loss_bce_dir_mean": 1.2685303020477294,
+            "loss_mse_mean": 3.3392861175537107
+        },
+        {
+            "loss_mean": 4.82861236333847,
+            "loss_bce_adj_mean": 0.1819722648523748,
+            "loss_bce_dir_mean": 1.2813290786743163,
+            "loss_mse_mean": 3.365311039686203
+        },
+        {
+            "loss_mean": 4.810011055469513,
+            "loss_bce_adj_mean": 0.1834639887139201,
+            "loss_bce_dir_mean": 1.2754049742221831,
+            "loss_mse_mean": 3.351142089366913
+        },
+        {
+            "loss_mean": 4.7389175319671635,
+            "loss_bce_adj_mean": 0.17692025220021607,
+            "loss_bce_dir_mean": 1.2685693049430846,
+            "loss_mse_mean": 3.293427964448929
+        },
+        {
+            "loss_mean": 4.819374160766602,
+            "loss_bce_adj_mean": 0.21707303892821073,
+            "loss_bce_dir_mean": 1.2975107431411743,
+            "loss_mse_mean": 3.3047903537750245
+        },
+        {
+            "loss_mean": 4.980428957939148,
+            "loss_bce_adj_mean": 0.2736192091135308,
+            "loss_bce_dir_mean": 1.3504492402076722,
+            "loss_mse_mean": 3.3563604843616486
+        },
+        {
+            "loss_mean": 5.04929826259613,
+            "loss_bce_adj_mean": 0.309678543638438,
+            "loss_bce_dir_mean": 1.380568335056305,
+            "loss_mse_mean": 3.359051368832588
+        },
+        {
+            "loss_mean": 5.125486171245575,
+            "loss_bce_adj_mean": 0.3655109397834167,
+            "loss_bce_dir_mean": 1.39836128950119,
+            "loss_mse_mean": 3.361613946557045
+        }
+    ],
+    "test_mean_accuracy": [
+        {
+            "accuracy_adj": 0.8514285714285716,
+            "accuracy_dir": 0.35594605788588524
+        },
+        {
+            "accuracy_adj": 0.8521428571428571,
+            "accuracy_dir": 0.35610919646918776
+        },
+        {
+            "accuracy_adj": 0.8553571428571429,
+            "accuracy_dir": 0.3457699111104012
+        },
+        {
+            "accuracy_adj": 0.8514285714285711,
+            "accuracy_dir": 0.3331291536986828
+        },
+        {
+            "accuracy_adj": 0.8614285714285717,
+            "accuracy_dir": 0.357613774985075
+        },
+        {
+            "accuracy_adj": 0.8628571428571429,
+            "accuracy_dir": 0.3442993495613337
+        },
+        {
+            "accuracy_adj": 0.8578571428571432,
+            "accuracy_dir": 0.36402513675391673
+        },
+        {
+            "accuracy_adj": 0.8499999999999999,
+            "accuracy_dir": 0.36801218129694463
+        },
+        {
+            "accuracy_adj": 0.8514285714285714,
+            "accuracy_dir": 0.3827047584950924
+        },
+        {
+            "accuracy_adj": 0.8514285714285712,
+            "accuracy_dir": 0.37950027637183664
+        }
+    ]
+}
