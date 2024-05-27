@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle as plt_Rectangle
 from typing import List
 from dataclasses_rect_point import Rectangle, Point
+import seaborn as sns
 
 
 def get_plt_rects(rects: List[Rectangle]):
@@ -18,9 +19,9 @@ def get_plt_rects(rects: List[Rectangle]):
                 rect.width,
                 rect.height,
                 fill=True,
-                color="blue",
+                color=sns.color_palette("pastel")[0],
                 ec="black",
-                alpha=0.7,
+                alpha=0.9,
             )
             plt_rects.append(plt_rect)
         except ValueError as e:

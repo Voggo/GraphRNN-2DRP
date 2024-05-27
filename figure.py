@@ -11,13 +11,10 @@ from plot_rects import *
 from dataclasses_rect_point import Rectangle, Point
 from utils import *
 from generator import *
-#possible to use: 7
-# for i in range(25):
-#     random.seed(i)
-#     i = i + 1 
 
 if __name__ == "__main__":
-    for i in range(50):
+    for i in range(1):
+        i = 7
         random.seed(i)
 
         # Generate random rectangles
@@ -57,4 +54,3 @@ if __name__ == "__main__":
             continue
         show_graph_with_labels(bfs_adj, {i: i for i in range(len(bfs_nodes))})
         print(i)
-        i = i + 10
