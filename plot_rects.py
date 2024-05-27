@@ -36,6 +36,7 @@ def plot_rects(
     ay_min=0,
     filename="rects.png",
     show=True,
+    show_number = True
 ):
     """Plot a list of Rectangle dataclasses."""
     _, ax = plt.subplots()
@@ -43,14 +44,15 @@ def plot_rects(
     ax.set_ylim(ay_min, ay_lim)
     plt_rects = get_plt_rects(rects)
     for plt_rect in plt_rects:
-        ax.text(
-            plt_rect.get_x() + plt_rect.get_width() / 2,
-            plt_rect.get_y() + plt_rect.get_height() / 2,
-            f"{plt_rects.index(plt_rect)}",
-            ha="center",
-            va="center",
-            color="black",
-        )
+        if show_number == True:
+            ax.text(
+                plt_rect.get_x() + plt_rect.get_width() / 2,
+                plt_rect.get_y() + plt_rect.get_height() / 2,
+                f"{plt_rects.index(plt_rect)}",
+                ha="center",
+                va="center",
+                color="black",
+            )
         ax.add_patch(plt_rect)
     plt.savefig(
         f"plots_img/{filename}",

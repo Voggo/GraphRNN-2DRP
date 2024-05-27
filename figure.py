@@ -12,9 +12,9 @@ from dataclasses_rect_point import Rectangle, Point
 from utils import *
 from generator import *
 #possible to use: 7
-for i in range(25):
-    random.seed(i)
-    i = i + 1 
+# for i in range(25):
+#     random.seed(i)
+#     i = i + 1 
 
 if __name__ == "__main__":
     for i in range(50):
@@ -27,7 +27,7 @@ if __name__ == "__main__":
         rects_list = list(set(rects_list))
 
         # Plot the rectangles
-        plot_rects(rects_list, 50, 50)
+        plot_rects(rects_list, 50, 50, show_number = False)
 
         # Reduce the number of rectangles
         reduced_rects = reduce_rects(rects, convergence_limit=100)
@@ -57,4 +57,4 @@ if __name__ == "__main__":
             continue
         show_graph_with_labels(bfs_adj, {i: i for i in range(len(bfs_nodes))})
         print(i)
-        i = i + 1
+        i = i + 10
