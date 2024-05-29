@@ -37,7 +37,7 @@ def plot_rects(
     ay_min=0,
     filename="rects.png",
     show=True,
-    show_number = True
+    show_number=True,
 ):
     """Plot a list of Rectangle dataclasses."""
     _, ax = plt.subplots()

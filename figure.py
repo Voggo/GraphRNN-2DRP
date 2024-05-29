@@ -18,20 +18,20 @@ if __name__ == "__main__":
         random.seed(i)
 
         # Generate random rectangles
-        rects = generate_rects(50,50, 5)
-        #convert np.aaay to list of rectangles
+        rects = generate_rects(50, 50, 5)
+        # convert np.aaay to list of rectangles
         rects_list: list[Rectangle] = rects.flatten().tolist()
         rects_list = list(set(rects_list))
 
         # Plot the rectangles
-        plot_rects(rects_list, 50, 50, show_number = False)
+        plot_rects(rects_list, 50, 50, show_number=False)
 
         # Reduce the number of rectangles
         reduced_rects = reduce_rects(rects, convergence_limit=100)
         # Plot the rectangles
-        if  len(reduced_rects) < 3:
+        if len(reduced_rects) < 3:
             continue
-        plot_rects(reduced_rects,50,50)
+        plot_rects(reduced_rects, 50, 50, show_number=False)
 
         # Convert the rectangles to a graph
         adj, edir, offset = convert_rects_to_graph(reduced_rects)
@@ -42,7 +42,6 @@ if __name__ == "__main__":
             nodes.append(copy.copy(rect))
         for node in nodes:
             node.lower_left = None
-
 
         bfs_order = bfs_index(adj, 0)
         bfs_nodes = [nodes[i] for i in bfs_order]
