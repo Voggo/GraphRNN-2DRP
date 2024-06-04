@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import networkx as nx
+import random
 from generator import generate_rects_and_graph, convert_graph_to_rects
 
 
@@ -13,8 +14,25 @@ def get_bfs_index(adj, start):
     print(nodes)
     return nodes
 
+def random_product_pair(N, max_factor):
+    factors = [i for i in range(1, N + 1) if N % i == 0 and i <= max_factor and i * max_factor >= N]
+    if not factors:
+        return (N, 1)
+    a = random.choice(factors)
+    b = N // a
+    return (a, b)
 
-def generate_datasets(num_graphs, height, width, test=False, n_breaks=6):
+def split_into_random_numbers(total, n):
+    # Generate n-1 random points within the range 0 to N
+    points = sorted(random.sample(range(1, total), n - 1))
+    intervals = [points[0]] + [points[i] - points[i - 1] for i in range(1, len(points))] + [total - points[-1]]
+    return intervals
+
+def total_area(rects):
+    return sum([rect[0] * rect[1] for rect in rects])
+
+
+def generate_datasets(num_graphs, height, width, test=False, n_breaks=6, randomize_nodes=False):
     max_num_nodes = 16
     data_bfs_nodes = {i: [] for i in range(4, max_num_nodes + 1)}
     data_nodes_width = {i: [] for i in range(4, max_num_nodes + 1)}
@@ -31,6 +49,17 @@ def generate_datasets(num_graphs, height, width, test=False, n_breaks=6):
         nodes = list(map(lambda x: x.get_as_node(), rects))
         bfs_index = get_bfs_index(adj, 0)
         bfs_nodes = [nodes[i] for i in bfs_index]
+        if randomize_nodes:
+            areas = split_into_random_numbers(height * width, nodes_len)
+            for node, area in zip(bfs_nodes, areas):
+                rect_height, rect_width = random_product_pair(area, height)
+                i = 1
+                while rect_height > height or rect_width > width:
+                    rect_height, rect_width = random_product_pair(area - i, height)
+                    i = i + 1
+                node[0] = rect_width
+                node[1] = rect_height
+            print(f"Total area: {total_area(bfs_nodes)}")
         data_bfs_nodes[nodes_len].append(np.array(bfs_nodes))
         data_nodes_width[nodes_len].append(
             np.tile(
@@ -135,9 +164,14 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    # generate_datasets(10000, 100, 100, test=False)
-    data = Dataset(8, test=True)
+    # generate_datasets(100, 100, 100, test=True, randomize_nodes=True)
+    data = Dataset(16, test=True)
     print(f"test len: {len(data)}")
+    nodes = data.data_bfs_nodes
+    areas = []
+    for graph in nodes:
+        areas.append(total_area(graph))
+    print(f"Total area: {sum(areas)/len(nodes)}")
     data = Dataset(6, test=False)
     print(f"train len: {len(data)}")
     

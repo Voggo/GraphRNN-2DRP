@@ -180,7 +180,9 @@ def train_rnn(
                 F.binary_cross_entropy(y_pred[:, :, :num_nodes], y[:, :, :num_nodes])
                 / batch_size
             )
-            splits = torch.split(y_pred[:, :, num_nodes : num_nodes * 6], num_nodes, dim=2)
+            splits = torch.split(
+                y_pred[:, :, num_nodes : num_nodes * 6], num_nodes, dim=2
+            )
             y_pred_dir = torch.stack(splits, dim=1)
             loss_kl_dir = (
                 F.cross_entropy(
@@ -345,10 +347,13 @@ def test_rnn(device, rnn_graph, rnn_edge, num_nodes, test_data):
             y_pred[:, :, num_nodes * 2 : num_nodes * 3] *= y_pred_adj
             y_pred[:, :, num_nodes : num_nodes * 2] *= torch.tril(1 - y_pred_adj)
             y_pred[:, :, :num_nodes] = torch.tril(y_pred[:, :, :num_nodes].clone())
-            loss_kl_adj = F.binary_cross_entropy(
-                y_pred[:, :, :num_nodes], y[:, :, :num_nodes]
-            ) / batch_size
-            splits = torch.split(y_pred[:, :, num_nodes : num_nodes * 6], num_nodes, dim=2)
+            loss_kl_adj = (
+                F.binary_cross_entropy(y_pred[:, :, :num_nodes], y[:, :, :num_nodes])
+                / batch_size
+            )
+            splits = torch.split(
+                y_pred[:, :, num_nodes : num_nodes * 6], num_nodes, dim=2
+            )
             y_pred_dir = torch.stack(splits, dim=1)
             loss_kl_dir = (
                 F.cross_entropy(
@@ -651,11 +656,11 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = False
 
     # "train" or "test"
-    mode = "random_graph"
+    mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_13"
+    model_dir_name = "model_14"
     # Size of the graph you want to train or test on
-    data_graph_size = 8
+    data_graph_size = 16
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
@@ -671,9 +676,12 @@ if __name__ == "__main__":
     sample_size = 0  # automatically set
 
     if mode == "test":
-        dataset = Dataset(data_graph_size, test=False)
+        test = True
+        dataset = Dataset(data_graph_size, test=test)
+        num_samples = 100  # specify the number of samples you want
+        limited_dataset = torch.utils.data.Subset(dataset, range(num_samples))
         data = torch.utils.data.DataLoader(
-            dataset, batch_size=1, shuffle=False, num_workers=0
+            limited_dataset, batch_size=1, shuffle=False, num_workers=0
         )
         hp = {}
         with open(  # pylint: disable=unspecified-encoding
@@ -707,11 +715,20 @@ if __name__ == "__main__":
                 map_location=torch.device("cpu") if not use_cuda else None,
             )
         )
-        test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
+        # test_metrics = test_rnn(device, rnn_graph, rnn_edge, data_graph_size, data)
         fill_ratios = []
         overlap_areas = []
         cutoff_areas = []
-        for i in range(len(dataset)):
+        test_size = len(limited_dataset)
+        data_type = "test_data" if test else "training_data"
+        if not os.path.exists(
+            f"models/{model_dir_name}_graph_size_{data_graph_size}/packing_solutions_{data_type}"
+        ):
+            os.mkdir(
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/packing_solutions_{data_type}"
+            )
+
+        for i in range(test_size):
             print(f"graph: {i}")
             max_utility = 0
             best_rects = None
@@ -730,7 +747,11 @@ if __name__ == "__main__":
                 fill_ratio, overlap_area, cutoff_area = evaluate_solution(
                     rects, 100, 100
                 )
-                utility = fill_ratio - 0.0 * (overlap_area / 10000) - 0.0 * (cutoff_area / 10000)
+                utility = (
+                    fill_ratio
+                    - 0.0 * (overlap_area / 10000)
+                    - 0.0 * (cutoff_area / 10000)
+                )
                 if utility > max_utility:
                     max_utility = utility
                     best_rects = rects
@@ -740,18 +761,22 @@ if __name__ == "__main__":
             fill_ratios.append(fill_ratio)
             overlap_areas.append(overlap_area)
             cutoff_areas.append(cutoff_area)
-            print(f"fill ratio: {fill_ratio}, overlap area: {overlap_area}, cutoff area: {cutoff_area}")
+            print(
+                f"fill ratio: {fill_ratio}, overlap area: {overlap_area}, cutoff area: {cutoff_area}"
+            )  # pylint: disable=line-too-long
             plot_rects(
                 best_rects,
                 ax_lim=100,
                 ay_lim=100,
                 ax_min=-50,
                 ay_min=-50,
-                filename="rnn_rnn.png",
+                filename=f"models/{model_dir_name}_graph_size_{data_graph_size}/packing_solutions_{data_type}/graph_{i}.png",  # pylint: disable=line-too-long
+                show=False,
+                title=f"$F={round(fill_ratio * 100, 1)}\% \quad O = {round(overlap_area, 1)}\quad C = {round(cutoff_area, 1)}$",  # pylint: disable=line-too-long
             )
-        avr_fill_ratio = sum(fill_ratios) / (len(dataset))
-        avr_overlap_area = sum(overlap_areas) / (len(dataset))
-        avr_cutoff_area = sum(cutoff_areas) / (len(dataset))
+        avr_fill_ratio = sum(fill_ratios) / test_size
+        avr_overlap_area = sum(overlap_areas) / test_size
+        avr_cutoff_area = sum(cutoff_areas) / test_size
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
@@ -765,7 +790,7 @@ if __name__ == "__main__":
                 "avr_cutoff_area": avr_cutoff_area,
             },
             open(
-                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_inference_stats.json",
+                f"models/{model_dir_name}_graph_size_{data_graph_size}/test_inference_stats_{data_type}.json",  # pylint: disable=line-too-long
                 "w",
             ),
         )
@@ -827,10 +852,16 @@ if __name__ == "__main__":
         )
     if mode == "random_graph":
         dataset = Dataset(data_graph_size, test=True)
+        num_samples = 100  # specify the number of samples you want
+        limited_dataset = torch.utils.data.Subset(dataset, range(num_samples))
+        data = torch.utils.data.DataLoader(
+            limited_dataset, batch_size=1, shuffle=False, num_workers=0
+        )
         fill_ratios = []
         overlap_areas = []
         cutoff_areas = []
-        for i in range(len(dataset)):
+        test_size = len(limited_dataset)
+        for i in range(test_size):
             nodes = dataset.data_bfs_nodes[i]
             rects = []
             best_rects = None
@@ -847,8 +878,10 @@ if __name__ == "__main__":
                 if fill_ratio > max_fill_ratio:
                     max_fill_ratio = fill_ratio
                     best_rects = new_rects
-                
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
+
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                best_rects, 100, 100
+            )
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
@@ -856,9 +889,9 @@ if __name__ == "__main__":
             overlap_areas.append(overlap_area)
             cutoff_areas.append(cutoff_area)
             # plot_rects(rects, ax_lim=100, ay_lim=100, ax_min=-50, ay_min=-50)
-        avr_fill_ratio = sum(fill_ratios) / len(dataset)
-        avr_overlap_area = sum(overlap_areas) / len(dataset)
-        avr_cutoff_area = sum(cutoff_areas) / len(dataset)
+        avr_fill_ratio = sum(fill_ratios) / test_size
+        avr_overlap_area = sum(overlap_areas) / test_size
+        avr_cutoff_area = sum(cutoff_areas) / test_size
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
@@ -876,10 +909,16 @@ if __name__ == "__main__":
 
     if mode == "random_pos":
         dataset = Dataset(data_graph_size, test=True)
+        num_samples = 100  # specify the number of samples you want
+        limited_dataset = torch.utils.data.Subset(dataset, range(num_samples))
+        data = torch.utils.data.DataLoader(
+            limited_dataset, batch_size=1, shuffle=False, num_workers=0
+        )
         fill_ratios = []
         overlap_areas = []
         cutoff_areas = []
-        for i in range(len(dataset)):
+        test_size = len(limited_dataset)
+        for i in range(test_size):
             nodes = dataset.data_bfs_nodes[i]
             rects = []
             best_rects = None
@@ -889,11 +928,15 @@ if __name__ == "__main__":
                 for node in nodes:
                     rects.append(Rectangle(node[0], node[1], 0))
                 rects = generate_random_rect_positions(rects, 100, 100)
-                fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
+                fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                    rects, 100, 100
+                )
                 if fill_ratio > max_fill_ratio:
                     max_fill_ratio = fill_ratio
                     best_rects = rects
-            fill_ratio, overlap_area, cutoff_area = evaluate_solution(best_rects, 100, 100)
+            fill_ratio, overlap_area, cutoff_area = evaluate_solution(
+                best_rects, 100, 100
+            )
             print(f"fill ratio: {fill_ratio}")
             print(f"overlap area: {overlap_area}")
             print(f"cutoff area: {cutoff_area}")
@@ -901,9 +944,9 @@ if __name__ == "__main__":
             overlap_areas.append(overlap_area)
             cutoff_areas.append(cutoff_area)
             # plot_rects(rects, ax_lim=150, ay_lim=150, ax_min=0, ay_min=0)
-        avr_fill_ratio = sum(fill_ratios) / len(dataset)
-        avr_overlap_area = sum(overlap_areas) / len(dataset)
-        avr_cutoff_area = sum(cutoff_areas) / len(dataset)
+        avr_fill_ratio = sum(fill_ratios) / test_size
+        avr_overlap_area = sum(overlap_areas) / test_size
+        avr_cutoff_area = sum(cutoff_areas) / test_size
         print(f"avr fill ratio: {avr_fill_ratio}")
         print(f"avr overlap area: {avr_overlap_area}")
         print(f"avr cutoff area: {avr_cutoff_area}")
