@@ -1,0 +1,7 @@
+[MESSAGES CONTROL]
+disable=
+    missing-docstring,  # Disable missing docstring warnings
+    redefined-outer-name,  # Disable redefined outer name warnings
+    unspecified-encoding,  # Disable unspecified encoding warnings
+    not-callable,  # Disable not callable warnings
+

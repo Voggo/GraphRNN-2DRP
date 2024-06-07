@@ -1,130 +1,122 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 import networkx as nx
-from generator import generate_rects_and_graph
+import random
+from generator import generate_rects_and_graph, convert_graph_to_rects
 
 
-class DatasetSimple(torch.utils.data.Dataset):
-    def __init__(self, num_graphs, height, width):
-        self.n_breaks = 5
-        self.data_adj = []
-        self.data_bfs_adj = []
-        self.max_num_nodes = 0
+def get_bfs_index(adj, start):
+    """return the index of the nodes in bfs order"""
+    graph = nx.from_numpy_array(adj)
+    bfs_edges = nx.bfs_edges(graph, start)
+    nodes = [start] + [v for u, v in bfs_edges]
+    print(nodes)
+    return nodes
 
-        self.num_graphs = num_graphs
+def random_product_pair(N, max_factor):
+    factors = [i for i in range(1, N + 1) if N % i == 0 and i <= max_factor and i * max_factor >= N]
+    if not factors:
+        return (N, 1)
+    a = random.choice(factors)
+    b = N // a
+    return (a, b)
 
-        for _ in range(num_graphs):
-            rects, adj, _, _ = generate_rects_and_graph(height, width, self.n_breaks)
-            nodes = list(map(lambda x: x.get_as_node(), rects))
-            self.max_num_nodes = max(self.max_num_nodes, len(nodes))
-            self.data_adj.append(adj)
-            bfs_index = self.bfs_index(adj, 0)
-            self.data_bfs_adj.append(adj[np.ix_(bfs_index, bfs_index)])
+def split_into_random_numbers(total, n):
+    # Generate n-1 random points within the range 0 to N
+    points = sorted(random.sample(range(1, total), n - 1))
+    intervals = [points[0]] + [points[i] - points[i - 1] for i in range(1, len(points))] + [total - points[-1]]
+    return intervals
 
-        for i, bfs_adj in enumerate(self.data_bfs_adj):
-            # Calculate padding size
-            pad_size = self.max_num_nodes - bfs_adj.shape[0]
+def total_area(rects):
+    return sum([rect[0] * rect[1] for rect in rects])
 
-            # Pad the array
-            if pad_size > 0:
-                self.data_bfs_adj[i] = np.pad(
-                    bfs_adj, ((0, pad_size), (0, pad_size)), mode="constant"
-                )
 
-    def bfs_index(self, adj, start):
-        """return the index of the nodes in bfs order"""
-        graph = nx.from_numpy_array(adj)
-        bfs_edges = nx.bfs_edges(graph, start)
-        nodes = [start] + [v for u, v in bfs_edges]
-        print(nodes)
-        return nodes
+def generate_datasets(num_graphs, height, width, test=False, n_breaks=6, randomize_nodes=False):
+    max_num_nodes = 16
+    data_bfs_nodes = {i: [] for i in range(4, max_num_nodes + 1)}
+    data_nodes_width = {i: [] for i in range(4, max_num_nodes + 1)}
+    data_nodes_height = {i: [] for i in range(4, max_num_nodes + 1)}
+    data_bfs_adj = {i: [] for i in range(4, max_num_nodes + 1)}
+    data_bfs_edge_dir = {i: [] for i in range(4, max_num_nodes + 1)}
+    data_bfs_offset = {i: [] for i in range(4, max_num_nodes + 1)}
+    is_full = {i: False for i in range(4, max_num_nodes + 1)}
+    while True:
+        rects, adj, edge_dir, offset = generate_rects_and_graph(height, width, n_breaks)
+        nodes_len = len(rects)
+        if nodes_len < 4 or nodes_len > max_num_nodes or is_full[nodes_len]:
+            continue
+        nodes = list(map(lambda x: x.get_as_node(), rects))
+        bfs_index = get_bfs_index(adj, 0)
+        bfs_nodes = [nodes[i] for i in bfs_index]
+        if randomize_nodes:
+            areas = split_into_random_numbers(height * width, nodes_len)
+            for node, area in zip(bfs_nodes, areas):
+                rect_height, rect_width = random_product_pair(area, height)
+                i = 1
+                while rect_height > height or rect_width > width:
+                    rect_height, rect_width = random_product_pair(area - i, height)
+                    i = i + 1
+                node[0] = rect_width
+                node[1] = rect_height
+            print(f"Total area: {total_area(bfs_nodes)}")
+        data_bfs_nodes[nodes_len].append(np.array(bfs_nodes))
+        data_nodes_width[nodes_len].append(
+            np.tile(
+                data_bfs_nodes[nodes_len][-1][:, 0],
+                (len(data_bfs_nodes[nodes_len][-1]), 1),
+            ).T
+        )
+        data_nodes_height[nodes_len].append(
+            np.tile(
+                data_bfs_nodes[nodes_len][-1][:, 1],
+                (len(data_bfs_nodes[nodes_len][-1]), 1),
+            ).T
+        )
+        data_bfs_adj[nodes_len].append(adj[np.ix_(bfs_index, bfs_index)])
+        data_bfs_edge_dir[nodes_len].append(edge_dir[np.ix_(bfs_index, bfs_index)])
+        data_bfs_offset[nodes_len].append(offset[np.ix_(bfs_index, bfs_index)])
 
-    def __len__(self):
-        return self.num_graphs
-
-    def __getitem__(self, index):
-        x = np.zeros((self.max_num_nodes + 1, self.max_num_nodes))
-        y = np.zeros((self.max_num_nodes + 1, self.max_num_nodes))
-        x[0, :] = np.ones((1, self.max_num_nodes))
-        y[:-1, :] = self.data_bfs_adj[index]
-        x[1:, :] = self.data_bfs_adj[index]
-        y = torch.tensor(y)
-        x = torch.tensor(x)
-        return {"x": x, "y": y}
+        if len(data_bfs_nodes[nodes_len]) == num_graphs:
+            is_full[nodes_len] = True
+            if all(is_full.values()):
+                break
+    print("Done generating datasets")
+    for i in range(4, max_num_nodes + 1):
+        data_bfs_nodes[i] = np.array(data_bfs_nodes[i])
+        data_nodes_width[i] = np.array(data_nodes_width[i])
+        data_nodes_height[i] = np.array(data_nodes_height[i])
+        data_bfs_adj[i] = np.array(data_bfs_adj[i])
+        data_bfs_edge_dir[i] = np.array(data_bfs_edge_dir[i])
+        data_bfs_offset[i] = np.array(data_bfs_offset[i])
+        suffix = "_test" if test else ""
+        np.save(f"datasets/data_bfs_nodes_{i}{suffix}.npy", data_bfs_nodes[i])
+        np.save(f"datasets/data_nodes_width_{i}{suffix}.npy", data_nodes_width[i])
+        np.save(f"datasets/data_nodes_height_{i}{suffix}.npy", data_nodes_height[i])
+        np.save(f"datasets/data_bfs_adj_{i}{suffix}.npy", data_bfs_adj[i])
+        np.save(f"datasets/data_bfs_edge_dir_{i}{suffix}.npy", data_bfs_edge_dir[i])
+        np.save(f"datasets/data_bfs_offset_{i}{suffix}.npy", data_bfs_offset[i])
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, num_graphs, height, width):
-        self.n_breaks = 5
-        self.data_nodes = []
-        self.data_nodes_width = []
-        self.data_nodes_height = []
-        self.data_bfs_nodes = []
-        self.data_adj = []
-        self.data_bfs_adj = []
-        self.data_edge_dir = []
-        self.data_bfs_edge_dir = []
-        self.data_edge_angle = []
-        self.data_bfs_edge_angle = []
-        self.max_num_nodes = 0
-
-        self.num_graphs = num_graphs
-
-        for _ in range(num_graphs):
-            rects, adj, edge_dir, edge_angle = generate_rects_and_graph(
-                height, width, self.n_breaks
-            )
-            nodes = list(map(lambda x: x.get_as_node(), rects))
-            self.max_num_nodes = max(self.max_num_nodes, len(nodes))
-
-            self.data_nodes.append(nodes)
-            self.data_adj.append(adj)
-            self.data_edge_angle.append(edge_angle)
-            self.data_edge_dir.append(edge_dir)
-
-            bfs_index = self.bfs_index(adj, 0)
-            self.data_bfs_nodes.append(np.array([nodes[i] for i in bfs_index]))
-            self.data_bfs_adj.append(adj[np.ix_(bfs_index, bfs_index)])
-            self.data_bfs_edge_dir.append(edge_dir[np.ix_(bfs_index, bfs_index)])
-            self.data_bfs_edge_angle.append(edge_angle[np.ix_(bfs_index, bfs_index)])
-        self.data_nodes_width = [0] * num_graphs
-        self.data_nodes_height = [0] * num_graphs
-        for i, bfs_adj in enumerate(self.data_bfs_adj):
-            # Calculate padding size
-            pad_size = self.max_num_nodes - bfs_adj.shape[0]
-            self.data_nodes_width[i] = np.tile(
-                self.data_bfs_nodes[i][:, 0], (len(self.data_bfs_nodes[i]), 1)
-            ).T
-            self.data_nodes_height[i] = np.tile(
-                self.data_bfs_nodes[i][:, 1], (len(self.data_bfs_nodes[i]), 1)
-            ).T
-            # Pad the array
-            if pad_size > 0:
-                self.data_bfs_adj[i] = np.pad(
-                    self.data_bfs_adj[i],
-                    ((0, pad_size), (0, pad_size)),
-                    mode="constant",
-                )
-                self.data_bfs_edge_dir[i] = np.pad(
-                    self.data_bfs_edge_dir[i],
-                    ((0, pad_size), (0, pad_size)),
-                    mode="constant",
-                )
-                self.data_bfs_edge_angle[i] = np.pad(
-                    self.data_bfs_edge_angle[i],
-                    ((0, pad_size), (0, pad_size)),
-                    mode="constant",
-                )
-                self.data_nodes_width[i] = np.pad(
-                    self.data_nodes_width[i],
-                    ((0, pad_size), (0, pad_size)),
-                    mode="constant",
-                )
-                self.data_nodes_height[i] = np.pad(
-                    self.data_nodes_height[i],
-                    ((0, pad_size), (0, pad_size)),
-                    mode="constant",
-                )
+    def __init__(self, node_len, test=False):
+        suffix = "_test" if test else ""
+        self.data_bfs_nodes = np.load(f"datasets/data_bfs_nodes_{node_len}{suffix}.npy")
+        self.data_nodes_width = np.load(
+            f"datasets/data_nodes_width_{node_len}{suffix}.npy"
+        )
+        self.data_nodes_height = np.load(
+            f"datasets/data_nodes_height_{node_len}{suffix}.npy"
+        )
+        self.data_bfs_adj = np.load(f"datasets/data_bfs_adj_{node_len}{suffix}.npy")
+        self.data_bfs_edge_dir = torch.LongTensor(
+            np.load(f"datasets/data_bfs_edge_dir_{node_len}{suffix}.npy")
+        )
+        self.data_bfs_offset = np.load(
+            f"datasets/data_bfs_offset_{node_len}{suffix}.npy"
+        )
+        self.max_num_nodes = node_len
+        self.num_graphs = len(self.data_bfs_nodes)
 
     def bfs_index(self, adj, start):
         """return the index of the nodes in bfs order"""
@@ -138,42 +130,48 @@ class Dataset(torch.utils.data.Dataset):
         return self.num_graphs
 
     def __getitem__(self, index):
-        nodes = np.array(self.data_nodes[index])
-        x = np.zeros((7, self.max_num_nodes + 1, self.max_num_nodes))
-        y = np.zeros((3, self.max_num_nodes, self.max_num_nodes))
-        x[:, 0:1, :] = np.ones((7, 1, self.max_num_nodes))
-        x[0, 1:, :] = np.tril(self.data_bfs_adj[index])
-        y[0, :, :] = np.tril(self.data_bfs_adj[index])
-        x[1, 1:, :] = np.tril(self.data_bfs_edge_dir[index])
-        y[1, :, :] = np.tril(self.data_bfs_edge_dir[index])
-        x[2, 1:, :] = np.tril(self.data_bfs_edge_angle[index])
-        y[2, :, :] = np.tril(self.data_bfs_edge_angle[index])
-        # x[3, 0, 1:] += 1 # add one to the first row but the first node in the graph
-        # y[3, :, :] = np.tril(self.data_nodes_width[index])
-        x[3, 1:, :] = np.tril(self.data_nodes_width[index])
-        x[4, 1:, :] = np.tril(self.data_nodes_height[index])
-        x[5, 1:, :] = np.tril(self.data_nodes_width[index].T)
-        x[6, 1:, :] = np.tril(self.data_nodes_height[index].T)
-        # x[4, 0, 1:] += 1 # add one to the first row but the first node in the graph
-        # y[4, :, :] = np.tril(self.data_nodes_height[index])
+        x = np.zeros((11, self.max_num_nodes, self.max_num_nodes))
+        y = np.zeros((7, self.max_num_nodes - 1, self.max_num_nodes))
+        edge_dir = np.array(F.one_hot(self.data_bfs_edge_dir[index], 5))
+        x[:, 0:1, :] = np.ones((11, 1, self.max_num_nodes))
+        x[0, 1:, :] = np.tril(self.data_bfs_adj[index][1:, :])
+        y[0, :, :] = np.tril(self.data_bfs_adj[index][1:, :])
+        x[1, 1:, :] = np.tril(edge_dir[1:, :, 0])
+        y[1, :, :] = np.tril(self.data_bfs_edge_dir[index][1:, :])
+        x[2, 1:, :] = np.tril(edge_dir[1:, :, 1])
+
+        x[3, 1:, :] = np.tril(edge_dir[1:, :, 2])
+
+        x[4, 1:, :] = np.tril(edge_dir[1:, :, 3])
+
+        x[5, 1:, :] = np.tril(edge_dir[1:, :, 4])
+  
+
+        x[6, 1:, :] = np.tril(self.data_bfs_offset[index][1:, :])
+        y[2, :, :] = np.tril(self.data_bfs_offset[index][1:, :])
+        x[7, :, :] = np.tril(self.data_nodes_width[index].T)
+        x[8, :, :] = np.tril(self.data_nodes_height[index].T)
+
+        nodes_width = np.tril(self.data_nodes_width[index][1:, :])
+        nodes_height = np.tril(self.data_nodes_height[index][1:, :])
+        nodes_width = np.vstack((nodes_width, np.zeros((1, self.max_num_nodes))))
+        nodes_height = np.vstack((nodes_height, np.zeros((1, self.max_num_nodes))))
+        x[9, :, :] = np.tril(nodes_width)
+        x[10, :, :] = np.tril(nodes_height)
         y = torch.tensor(y)
         x = torch.tensor(x)
-
-        nodes = torch.tensor(nodes)
         return {"x": x, "y": y}
 
 
 if __name__ == "__main__":
-    data = Dataset(10, 100, 100)
-    for i in range(10):
-        d = data[i]
-        x = d["x"]
-        print(x)
-        # print(x)
-        print(d["y"].shape)
-    # training_data = torch.utils.data.DataLoader(
-    #     data, batch_size=2, shuffle=False
-    # )
-    # for batch in training_data:
-    #     print(batch["x"].shape)
-    #     print(batch["y"].shape)
+    # generate_datasets(100, 100, 100, test=True, randomize_nodes=True)
+    data = Dataset(16, test=True)
+    print(f"test len: {len(data)}")
+    nodes = data.data_bfs_nodes
+    areas = []
+    for graph in nodes:
+        areas.append(total_area(graph))
+    print(f"Total area: {sum(areas)/len(nodes)}")
+    data = Dataset(6, test=False)
+    print(f"train len: {len(data)}")
+    

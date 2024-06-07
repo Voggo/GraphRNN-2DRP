@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import seaborn as sns
 from matplotlib.patches import Rectangle as plt_Rectangle
 from typing import List
 from dataclasses_rect_point import Rectangle, Point
@@ -18,13 +19,13 @@ def get_plt_rects(rects: List[Rectangle]):
                 rect.width,
                 rect.height,
                 fill=True,
-                color="blue",
+                color=sns.color_palette("pastel")[0],
                 ec="black",
-                alpha=0.7,
+                alpha=0.8,
             )
             plt_rects.append(plt_rect)
         except ValueError as e:
-            print(e)
+            e = str(e)
     return plt_rects
 
 
@@ -36,8 +37,18 @@ def plot_rects(
     ay_min=0,
     filename="rects.png",
     show=True,
+    title=None,
 ):
     """Plot a list of Rectangle dataclasses."""
+    plt.rcParams.update(
+        {
+            "font.family": "serif",
+            "font.serif": ["Computer Modern Roman"],
+            "font.size": 14,
+            "font.weight": "bold",
+            "text.usetex": True,
+        }
+    )
     _, ax = plt.subplots()
     ax.set_xlim(ax_min, ax_lim)
     ax.set_ylim(ay_min, ay_lim)
@@ -52,9 +63,11 @@ def plot_rects(
             color="black",
         )
         ax.add_patch(plt_rect)
-    plt.savefig(
-        f"plots_img/{filename}",
-    )  # Save the figure before showing it
+    ax.autoscale(enable=True, axis="both")
+    ax.set_aspect("equal", adjustable="datalim")
+    if title:
+        ax.set_title(title)
+    plt.savefig(f"{filename}", dpi=300)  # Save the figure before showing it
     if show:
         plt.show()
 
