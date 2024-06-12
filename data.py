@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import networkx as nx
 import random
-from generator import generate_rects_and_graph, convert_graph_to_rects
+from generator import generate_rects_and_graph
 
 
 def get_bfs_index(adj, start):

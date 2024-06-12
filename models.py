@@ -13,7 +13,7 @@ from generator import (
     generate_random_rect_positions,
 )
 from dataclasses_rect_point import Rectangle
-from utils import sample_graph, accuracy
+from utils import accuracy
 from eval_solutions import evaluate_solution
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -519,16 +519,6 @@ def test_inference_rnn(
         offset = y_pred[0, :, num_nodes * 6 :].reshape(num_nodes, num_nodes)
         offset.diagonal().fill_(0)
         offset = offset + offset.T
-        # print("current adj:")
-        # print(data.data_bfs_adj[graph])
-        # print(adj)
-        # print("current edge dir:")
-        # print(data.data_bfs_edge_dir[graph])
-        # print(edge_dir)
-        # print("current offset:")
-        # print(data.data_bfs_offset[graph])
-        # print(offset)
-        # Convert edge_dir to boolean tensor where True indicates the presence of an edge
         edge_mask = edge_dir > 0
         # Use the mask to filter the adjacency matrix
         adj = torch.where(edge_mask, adj, torch.zeros_like(adj))
@@ -538,28 +528,14 @@ def test_inference_rnn(
             nodes_rects = [
                 Rectangle(node[0].item(), node[1].item(), 0) for node in nodes
             ]
-            # sampled_graph = sample_graph(adj.cpu().numpy())
             sampled_graph = adj.numpy()
             rects = convert_graph_to_rects(
                 nodes_rects, sampled_graph, edge_dir.cpu().numpy(), offset.cpu().numpy()
             )
-            # rects = convert_center_to_lower_left(rects)
             fill_ratio, overlap_area, cutoff_area = evaluate_solution(rects, 100, 100)
             utility = fill_ratio - 0 * overlap_area / 10000 - 0 * cutoff_area / 10000
-            # print(f"utility: {utility}")
             if utility > max_utility:
                 best_rects = rects
-        # print(f"max fill ratio: {max_fill_ratio}")
-        # print(f"min overlap area: {min_overlap_area}")
-        # print(f"cut off area: {cutoff_area}")
-        # plot_rects(
-        #     best_rects,
-        #     ax_lim=100,
-        #     ay_lim=100,
-        #     ax_min=-50,
-        #     ay_min=-50,
-        #     filename="rnn_rnn.png",
-        # )
         return best_rects
 
 
@@ -655,12 +631,12 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = False
 
-    # "train" or "test"
+    # "train", "test", "random_graph" or "random_pos"
     mode = "test"
     # Name of model if training is selected it is created in testing it is loaded
-    model_dir_name = "model_14"
+    model_dir_name = "model_2"
     # Size of the graph you want to train or test on
-    data_graph_size = 16
+    data_graph_size = 8
 
     # Hyperparameters only relevant if training, in testing they are loaded from json
     learning_rate = 0.001
@@ -676,7 +652,7 @@ if __name__ == "__main__":
     sample_size = 0  # automatically set
 
     if mode == "test":
-        test = True
+        test = True  # True if testing on test data, False if testing on training data and using the right dataset
         dataset = Dataset(data_graph_size, test=test)
         num_samples = 100  # specify the number of samples you want
         limited_dataset = torch.utils.data.Subset(dataset, range(num_samples))

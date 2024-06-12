@@ -38,7 +38,6 @@ def generate_rects(width: int, height: int, n_breaks: int) -> np.ndarray:
 
 def reduce_rects(rects: np.ndarray, stagnation_limit=100) -> List[Rectangle]:
     """Return a list of randomly reduced Rectangles from a list of Rectangles."""
-
     convergence = 0
     while True:
         x = random.randint(0, rects.shape[0] - 1)

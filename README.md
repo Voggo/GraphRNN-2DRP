@@ -7,8 +7,8 @@ This code is part of our bachelor's thesis in Computer Engineering at Aarhus Uni
 It contains the code with all the logic for generating perfect packing solutions.
 ### data.py
 It contains the code responsible for building and loading the datasets.
-### models.py 
-It contains the code for our machine-learning model. 
+### models.py
+It contains the code for our machine-learning model.
 - Training
 - Testing
 - Inference
@@ -22,3 +22,5 @@ It contains the code for our machine-learning model.
 
 - The dataset each model has been trained with is inside the model folder if testing on the training data.
 - Remember to change the "test" variable to false, as this changes to using the training part of the dataset.
+
+The output packing solutions will be inside the respective model folder.
