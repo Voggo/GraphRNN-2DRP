@@ -12,6 +12,7 @@ from dataclasses_rect_point import Rectangle, Point
 from utils import *
 from generator import *
 
+
 if __name__ == "__main__":
     for i in range(1):
         i = 7
