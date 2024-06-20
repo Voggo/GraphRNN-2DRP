@@ -32,7 +32,7 @@ if __name__ == "__main__":
         # Plot the rectangles
         if len(reduced_rects) < 3:
             continue
-        plot_rects(reduced_rects, 50, 50, show_number=False)
+        plot_rects(reduced_rects, 50, 50, show_number=True)
 
         # Convert the rectangles to a graph
         adj, edir, offset = convert_rects_to_graph(reduced_rects)
@@ -52,5 +52,5 @@ if __name__ == "__main__":
 
         if len(bfs_nodes) < 3:
             continue
-        show_graph_with_labels(bfs_adj, {i: i for i in range(len(bfs_nodes))})
+        show_graph_with_labels(bfs_adj, {i: i for i in range(len(bfs_nodes))})          
         print(i)
